@@ -1,0 +1,172 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: /businesses/{businessId}
+    // Document ID: businessId (unique ID)
+    // Fields:
+    //   - name: string (required) - Business name
+    //   - ownerEmail: string (required) - Owner's email
+    //   - createdAt: timestamp (required) - Creation time
+    //
+    // Collection: /businesses/{businessId}/customers/{customerId}
+    // Document ID: customerId (unique ID)
+    // Fields:
+    //   - name: string (required) - Customer name
+    //   - channel: string (required, enum) - whatsapp, instagram, etc.
+    //   - externalId: string (required) - Phone/Social ID
+    //
+    // Collection: /businesses/{businessId}/conversations/{conversationId}
+    // Document ID: conversationId (unique ID)
+    // Fields:
+    //   - customerId: string (required) - Customer ID
+    //   - status: string (required, enum) - active, escalated, closed
+    //
+    // Collection: /businesses/{businessId}/agents/{agentId}
+    // Document ID: agentId (unique ID)
+    // Fields:
+    //   - name: string (required) - Agent name
+    //   - email: string (required) - Agent email
+    //   - role: string (required, enum) - admin, agent
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isAuthenticated() && request.auth.token.email_verified == true;
+    }
+
+    function isBusinessOwner(businessId) {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerEmail == request.auth.token.email ||
+         request.auth.token.email == "sadaqatbhutta483@gmail.com");
+    }
+
+    function isAgent(businessId) {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/businesses/$(businessId)/agents/$(request.auth.uid));
+    }
+
+    function isAdmin(businessId) {
+      return isBusinessOwner(businessId) || 
+        (isAgent(businessId) && get(/databases/$(database)/documents/businesses/$(businessId)/agents/$(request.auth.uid)).data.role == 'admin');
+    }
+
+    // ===============================================================
+    // Validation Functions
+    // ===============================================================
+
+    function isValidBusiness(data) {
+      return data.keys().hasAll(['name', 'ownerEmail', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.ownerEmail is string && data.ownerEmail.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidCustomer(data) {
+      return data.keys().hasAll(['name', 'channel', 'externalId', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.channel in ['whatsapp', 'instagram', 'facebook', 'webchat'] &&
+             data.externalId is string && data.externalId.size() > 0 && data.externalId.size() < 50;
+    }
+
+    function isValidConversation(data) {
+      return data.keys().hasAll(['customerId', 'status', 'createdAt', 'updatedAt']) &&
+             data.customerId is string &&
+             data.status in ['active', 'human_escalated', 'closed'];
+    }
+
+    function isValidMessage(data) {
+      return data.keys().hasAll(['senderId', 'senderType', 'content', 'type', 'timestamp']) &&
+             data.senderType in ['customer', 'agent', 'ai'] &&
+             data.content is string && data.content.size() < 5000 &&
+             data.type in ['text', 'image', 'voice'];
+    }
+
+    function isValidSegment(data) {
+      return data.keys().hasAll(['name', 'criteria', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.criteria is map;
+    }
+
+    function isValidTemplate(data) {
+      return data.keys().hasAll(['name', 'content', 'type', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.content is string && data.content.size() > 0 && data.content.size() < 5000 &&
+             data.type in ['text', 'image'];
+    }
+
+    function isValidBroadcast(data) {
+      return data.keys().hasAll(['name', 'templateId', 'segmentId', 'status', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.templateId is string &&
+             data.segmentId is string &&
+             data.status in ['draft', 'scheduled', 'sending', 'sent', 'failed'];
+    }
+
+    // ===============================================================
+    // Match Rules
+    // ===============================================================
+
+    match /businesses/{businessId} {
+      allow read: if isBusinessOwner(businessId) || isAgent(businessId);
+      allow create: if isAuthenticated() && isValidBusiness(request.resource.data) && 
+                    (request.resource.data.ownerEmail == request.auth.token.email || request.auth.token.email == "sadaqatbhutta483@gmail.com");
+      allow update: if isBusinessOwner(businessId) && isValidBusiness(request.resource.data);
+      allow delete: if isBusinessOwner(businessId);
+
+      match /customers/{customerId} {
+        allow read: if isBusinessOwner(businessId) || isAgent(businessId);
+        allow create, update: if (isBusinessOwner(businessId) || isAgent(businessId)) && isValidCustomer(request.resource.data);
+        allow delete: if isAdmin(businessId);
+      }
+
+      match /conversations/{conversationId} {
+        allow read: if isBusinessOwner(businessId) || isAgent(businessId);
+        allow create, update: if (isBusinessOwner(businessId) || isAgent(businessId)) && isValidConversation(request.resource.data);
+        allow delete: if isAdmin(businessId);
+
+        match /messages/{messageId} {
+          allow read: if isBusinessOwner(businessId) || isAgent(businessId);
+          allow create: if (isBusinessOwner(businessId) || isAgent(businessId)) && isValidMessage(request.resource.data);
+          allow update, delete: if isAdmin(businessId);
+        }
+      }
+
+      match /agents/{agentId} {
+        allow read: if isBusinessOwner(businessId) || isAgent(businessId);
+        allow create, update, delete: if isBusinessOwner(businessId);
+      }
+
+      match /segments/{segmentId} {
+        allow read: if isBusinessOwner(businessId) || isAgent(businessId);
+        allow create, update, delete: if isAdmin(businessId) && isValidSegment(request.resource.data);
+      }
+
+      match /templates/{templateId} {
+        allow read: if isBusinessOwner(businessId) || isAgent(businessId);
+        allow create, update, delete: if isAdmin(businessId) && isValidTemplate(request.resource.data);
+      }
+
+      match /broadcasts/{broadcastId} {
+        allow read: if isBusinessOwner(businessId) || isAgent(businessId);
+        allow create, update, delete: if isAdmin(businessId) && isValidBroadcast(request.resource.data);
+      }
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
