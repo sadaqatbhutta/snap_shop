@@ -16,11 +16,13 @@ import CRM from './pages/CRM';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 import AuthGuard from './components/AuthGuard';
+import { BusinessProvider } from './context/BusinessContext';
 
 export default function App() {
   return (
     <Router>
       <AuthGuard>
+        <BusinessProvider>
         <Layout>
           <Routes>
             <Route path="/" element={<Dashboard />} />
@@ -34,6 +36,7 @@ export default function App() {
             <Route path="/settings" element={<Settings />} />
           </Routes>
         </Layout>
+        </BusinessProvider>
       </AuthGuard>
     </Router>
   );

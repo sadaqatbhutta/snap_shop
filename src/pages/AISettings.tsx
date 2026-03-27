@@ -3,37 +3,48 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
-import { 
-  Bot, 
-  Save, 
-  Plus, 
-  X, 
-  Info,
-  ShieldCheck,
-  Zap
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Bot, Save, Plus, X, Info, ShieldCheck, Zap, Loader2, CheckCircle2 } from 'lucide-react';
+import { useBusiness } from '@/src/context/BusinessContext';
+import { db } from '@/src/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 
 export default function AISettings() {
-  const [businessContext, setBusinessContext] = useState(
-    "SnapShop is a clothing brand specializing in modern ethnic wear. We offer high-quality fabrics and unique designs for men and women. Our main store is located in Lahore, Pakistan."
-  );
-  const [faqs, setFaqs] = useState([
-    "What are your delivery charges? - Delivery is free on orders above $50. Otherwise, it's $5.",
-    "Do you offer international shipping? - Yes, we ship worldwide via DHL.",
-    "What is your return policy? - You can return any item within 14 days of purchase."
-  ]);
+  const { business, businessId, refreshBusiness } = useBusiness();
+  const [businessContext, setBusinessContext] = useState('');
+  const [faqs, setFaqs] = useState<string[]>([]);
   const [newFaq, setNewFaq] = useState('');
+  const [threshold, setThreshold] = useState(70);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (business) {
+      setBusinessContext(business.aiContext || '');
+      setFaqs(business.faqs || []);
+      setThreshold(Math.round((business.confidenceThreshold ?? 0.7) * 100));
+    }
+  }, [business]);
+
+  const handleSave = async () => {
+    if (!businessId) return;
+    setSaving(true);
+    await updateDoc(doc(db, 'businesses', businessId), {
+      aiContext: businessContext,
+      faqs,
+      confidenceThreshold: threshold / 100,
+    });
+    await refreshBusiness();
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
 
   const addFaq = () => {
     if (newFaq.trim()) {
-      setFaqs([...faqs, newFaq]);
+      setFaqs([...faqs, newFaq.trim()]);
       setNewFaq('');
     }
-  };
-
-  const removeFaq = (index: number) => {
-    setFaqs(faqs.filter((_, i) => i !== index));
   };
 
   return (
@@ -49,19 +60,23 @@ export default function AISettings() {
               <p className="text-sm text-gray-500">Define how your AI assistant behaves and what it knows.</p>
             </div>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors">
-            <Save className="w-4 h-4" />
-            Save Changes
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-60"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+            {saved ? 'Saved!' : 'Save Changes'}
           </button>
         </div>
 
         <div className="space-y-4">
           <label className="block text-sm font-medium text-gray-700">Business Context</label>
-          <textarea 
+          <textarea
             value={businessContext}
-            onChange={(e) => setBusinessContext(e.target.value)}
+            onChange={e => setBusinessContext(e.target.value)}
             rows={5}
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
+            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none"
             placeholder="Describe your business, products, and services..."
           />
           <div className="flex items-start gap-2 text-xs text-gray-500 bg-blue-50 p-3 rounded-lg border border-blue-100">
@@ -84,17 +99,15 @@ export default function AISettings() {
 
         <div className="space-y-4">
           <div className="flex gap-2">
-            <input 
-              type="text" 
+            <input
+              type="text"
               value={newFaq}
-              onChange={(e) => setNewFaq(e.target.value)}
+              onChange={e => setNewFaq(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addFaq()}
               placeholder="e.g., What are your store timings? - We are open from 10 AM to 10 PM."
-              className="flex-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
+              className="flex-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none"
             />
-            <button 
-              onClick={addFaq}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
-            >
+            <button onClick={addFaq} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors">
               Add FAQ
             </button>
           </div>
@@ -103,14 +116,15 @@ export default function AISettings() {
             {faqs.map((faq, index) => (
               <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 group">
                 <p className="text-sm text-gray-700">{faq}</p>
-                <button 
-                  onClick={() => removeFaq(index)}
+                <button
+                  onClick={() => setFaqs(faqs.filter((_, i) => i !== index))}
                   className="p-1 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
             ))}
+            {faqs.length === 0 && <p className="text-sm text-gray-400 text-center py-4">No FAQs yet. Add some above.</p>}
           </div>
         </div>
       </div>
@@ -124,9 +138,16 @@ export default function AISettings() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">Confidence Threshold</span>
-              <span className="text-sm font-bold text-indigo-600">70%</span>
+              <span className="text-sm font-bold text-indigo-600">{threshold}%</span>
             </div>
-            <input type="range" className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600" />
+            <input
+              type="range"
+              min={50}
+              max={95}
+              value={threshold}
+              onChange={e => setThreshold(Number(e.target.value))}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+            />
             <p className="text-xs text-gray-400">AI will escalate to a human if its confidence falls below this level.</p>
           </div>
         </div>
@@ -134,21 +155,18 @@ export default function AISettings() {
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
             <Zap className="w-5 h-5 text-yellow-600" />
-            <h4 className="font-semibold text-gray-900">Auto-Responses</h4>
+            <h4 className="font-semibold text-gray-900">Webhook Endpoint</h4>
           </div>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Handle Greetings</span>
-              <div className="w-10 h-5 bg-indigo-600 rounded-full relative">
-                <div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full"></div>
+          <div className="space-y-3">
+            <p className="text-xs text-gray-500">Send messages to these endpoints to trigger AI processing:</p>
+            {['whatsapp', 'instagram', 'facebook', 'webchat'].map(ch => (
+              <div key={ch} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                <span className="text-xs font-medium text-gray-600 capitalize">{ch}</span>
+                <code className="text-[10px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
+                  POST /api/webhook/{ch}
+                </code>
               </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Handle Out-of-Scope</span>
-              <div className="w-10 h-5 bg-gray-200 rounded-full relative">
-                <div className="absolute left-1 top-1 w-3 h-3 bg-white rounded-full"></div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </div>
