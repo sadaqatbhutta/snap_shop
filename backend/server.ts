@@ -20,6 +20,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { initializeApp, getApps } from 'firebase-admin/app';
 
+import helmet from 'helmet';
 import { config } from './core/config';
 import { requestLogger } from './core/logger';
 import { registerErrorHandlers } from './core/exceptions';
@@ -39,6 +40,8 @@ export async function createApp() {
   const app = express();
 
   // ── Global Middleware ──────────────────────────────────────────────────────
+  app.use(helmet());                    // Security headers (HSTS, X-Frame-Options, etc.)
+  app.disable('x-powered-by');          // Hide Express fingerprint
   app.use(cors());
   app.use(bodyParser.json());
   app.use(requestLogger);
