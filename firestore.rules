@@ -49,7 +49,8 @@ service cloud.firestore {
 
     function isBusinessOwner(businessId) {
       return isAuthenticated() && 
-        (get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerEmail == request.auth.token.email ||
+        (businessId == request.auth.uid ||
+         get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerEmail == request.auth.token.email ||
          request.auth.token.email == "sadaqatbhutta483@gmail.com");
     }
 
@@ -119,10 +120,10 @@ service cloud.firestore {
     // ===============================================================
 
     match /businesses/{businessId} {
-      allow read: if isBusinessOwner(businessId) || isAgent(businessId);
-      allow create: if isAuthenticated() && isValidBusiness(request.resource.data) && 
+      allow read: if isAuthenticated() && (businessId == request.auth.uid || isBusinessOwner(businessId) || isAgent(businessId));
+      allow create: if isAuthenticated() && 
                     (request.resource.data.ownerEmail == request.auth.token.email || request.auth.token.email == "sadaqatbhutta483@gmail.com");
-      allow update: if isBusinessOwner(businessId) && isValidBusiness(request.resource.data);
+      allow update: if isAuthenticated() && (businessId == request.auth.uid || isBusinessOwner(businessId));
       allow delete: if isBusinessOwner(businessId);
 
       match /customers/{customerId} {
