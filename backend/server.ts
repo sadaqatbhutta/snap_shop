@@ -2,8 +2,8 @@
  * SnapShop Backend Server
  * ─────────────────────────────────────────────
  * Responsibilities:
- *  1. Mount middleware (logging, body parsing, CORS)
- *  2. Mount API routes (webhook, EMR, health)
+ *  1. Mount middleware (logging, body parsing, CORS, rate limiting)
+ *  2. Mount API routes (webhook, EMR, observability)
  *  3. Register global error handlers
  *  4. Serve Vite dev middleware / static production build
  *
@@ -23,8 +23,10 @@ import { initializeApp, getApps } from 'firebase-admin/app';
 import { config } from './core/config';
 import { requestLogger } from './core/logger';
 import { registerErrorHandlers } from './core/exceptions';
+import { rateLimiter } from './core/rateLimit';
 import { webhookRouter } from './api/routes/webhook';
 import { emrRouter } from './api/routes/emr';
+import { observabilityRouter } from './api/routes/observability';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -33,7 +35,7 @@ const __dirname  = path.dirname(__filename);
 if (!getApps().length) initializeApp();
 
 // ─── Express App ──────────────────────────────────────────────────────────────
-async function startServer() {
+export async function createApp() {
   const app = express();
 
   // ── Global Middleware ──────────────────────────────────────────────────────
@@ -41,18 +43,33 @@ async function startServer() {
   app.use(bodyParser.json());
   app.use(requestLogger);
 
+  // ── Global Rate Limit (all /api routes) ───────────────────────────────────
+  app.use('/api', rateLimiter({
+    windowMs:    config.RATE_LIMIT_WINDOW_MS,
+    maxRequests: config.RATE_LIMIT_MAX_REQ,
+  }));
+
+  // ── Stricter Rate Limit for EMR (external API protection) ─────────────────
+  app.use('/api/emr', rateLimiter({
+    windowMs:    config.RATE_LIMIT_WINDOW_MS,
+    maxRequests: config.RATE_LIMIT_EMR_MAX_REQ,
+  }));
+
   // ── API Routes ─────────────────────────────────────────────────────────────
   app.use('/api/webhook', webhookRouter);
   app.use('/api/emr',     emrRouter);
-
-  app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
-  });
+  app.use('/api',         observabilityRouter);  // /api/logs, /api/metrics, /api/health
 
   // ── Global Error Handlers (must be after all routes) ──────────────────────
   registerErrorHandlers(app);
 
-  // ── Vite Dev / Static Production ──────────────────────────────────────────
+  return app;
+}
+
+// ─── Start (only when run directly, not during tests) ─────────────────────────
+async function startServer() {
+  const app = await createApp();
+
   if (config.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       root: path.resolve(__dirname, '../frontend'),
@@ -68,7 +85,10 @@ async function startServer() {
 
   app.listen(config.PORT, '0.0.0.0', () => {
     console.log(`\n🚀 SnapShop running at http://localhost:${config.PORT}\n`);
-    console.log(`   Workers: run 'npm run worker' to start background job processing\n`);
+    console.log(`   Workers : run 'npm run worker' to start background job processing`);
+    console.log(`   Logs    : GET /api/logs?status=failure&limit=50`);
+    console.log(`   Metrics : GET /api/metrics`);
+    console.log(`   Health  : GET /api/health\n`);
   });
 }
 

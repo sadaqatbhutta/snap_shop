@@ -25,6 +25,11 @@ const ConfigSchema = z.object({
   // Queue
   QUEUE_CONCURRENCY: z.coerce.number().default(5),
   QUEUE_MAX_RETRIES: z.coerce.number().default(3),
+
+  // Rate Limiting
+  RATE_LIMIT_WINDOW_MS:   z.coerce.number().default(60_000),  // 1 minute window
+  RATE_LIMIT_MAX_REQ:     z.coerce.number().default(60),      // 60 req/min per IP
+  RATE_LIMIT_EMR_MAX_REQ: z.coerce.number().default(10),      // stricter for EMR
 });
 
 function loadConfig() {
