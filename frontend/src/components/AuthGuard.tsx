@@ -155,7 +155,9 @@ export default function AuthGuard({ children }: AuthGuardProps) {
           </div>
           <div className="relative z-10">
             <div className="flex items-center gap-3 text-white mb-12">
-              <div className="p-2 bg-white/20 rounded-xl backdrop-blur-md"><Bot className="w-8 h-8" /></div>
+              <div className="p-2 bg-white/20 rounded-xl backdrop-blur-md overflow-hidden">
+                <img src="/favicon.png" className="w-8 h-8 object-cover" alt="Logo" />
+              </div>
               <span className="text-2xl font-bold tracking-tight text-white">SnapShop AI</span>
             </div>
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="max-w-md">
@@ -245,7 +247,9 @@ export default function AuthGuard({ children }: AuthGuardProps) {
           </div>
           <div className="relative z-10">
             <div className="flex items-center gap-3 text-white mb-12">
-              <div className="p-2 bg-white/20 rounded-xl backdrop-blur-md"><Bot className="w-8 h-8" /></div>
+              <div className="p-2 bg-white/20 rounded-xl backdrop-blur-md overflow-hidden">
+                <img src="/favicon.png" className="w-8 h-8 object-cover" alt="Logo" />
+              </div>
               <span className="text-2xl font-bold tracking-tight">SnapShop AI</span>
             </div>
             <div className="max-w-md">
