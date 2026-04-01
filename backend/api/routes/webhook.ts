@@ -1,16 +1,18 @@
 import { Router } from 'express';
 import { WebhookSchema } from '../../schemas/webhook';
 import { webhookQueue, emrQueue, getJobStatus } from '../../core/queue';
+import { verifyWebhookSignature } from '../../core/webhookAuth';
+import { config } from '../../core/config';
 
 export const webhookRouter = Router();
 
 /**
  * POST /api/webhook/:channel
  *
- * Validates payload, pushes to webhook queue, returns immediately.
+ * Validates payload and signature, pushes to webhook queue, returns immediately.
  * The full pipeline (Firestore + AI) runs asynchronously in the worker.
  */
-webhookRouter.post('/:channel', async (req, res, next) => {
+webhookRouter.post('/:channel', verifyWebhookSignature, async (req, res, next) => {
   try {
     const body    = WebhookSchema.parse(req.body);
     const channel = req.params.channel;
@@ -30,6 +32,23 @@ webhookRouter.post('/:channel', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+/**
+ * GET /api/webhook/:channel
+ *
+ * Verification handler for Meta (WhatsApp/Instagram) webhooks.
+ */
+webhookRouter.get('/:channel', (req, res) => {
+  const mode      = req.query['hub.mode'];
+  const token     = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  if (mode === 'subscribe' && token === config.WEBHOOK_VERIFY_TOKEN) {
+    return res.status(200).send(challenge);
+  }
+  
+  res.sendStatus(403);
 });
 
 /**

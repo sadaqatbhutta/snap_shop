@@ -27,6 +27,8 @@ import { registerErrorHandlers } from './core/exceptions';
 import { rateLimiter } from './core/rateLimit';
 import { webhookRouter } from './api/routes/webhook';
 import { emrRouter } from './api/routes/emr';
+import { teamRouter } from './api/routes/team';
+import { broadcastRouter } from './api/routes/broadcast';
 import { observabilityRouter } from './api/routes/observability';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -43,7 +45,11 @@ export async function createApp() {
   app.use(helmet());                    // Security headers (HSTS, X-Frame-Options, etc.)
   app.disable('x-powered-by');          // Hide Express fingerprint
   app.use(cors());
-  app.use(bodyParser.json());
+  app.use(bodyParser.json({
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf;
+    }
+  }));
   app.use(requestLogger);
 
   // ── Global Rate Limit (all /api routes) ───────────────────────────────────
@@ -61,6 +67,8 @@ export async function createApp() {
   // ── API Routes ─────────────────────────────────────────────────────────────
   app.use('/api/webhook', webhookRouter);
   app.use('/api/emr',     emrRouter);
+  app.use('/api/team',    teamRouter);
+  app.use('/api/broadcast', broadcastRouter);
   app.use('/api',         observabilityRouter);  // /api/logs, /api/metrics, /api/health
 
   // ── Global Error Handlers (must be after all routes) ──────────────────────

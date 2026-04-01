@@ -2,23 +2,17 @@ import { Queue, Worker, Job } from 'bullmq';
 import { config } from './config';
 import { log } from './logger';
 
-// ─── Connection ───────────────────────────────────────────────────────────────
-// Parse REDIS_URL into ioredis connection options
-function redisConnection() {
-  const url = new URL(config.REDIS_URL);
-  return {
-    host: url.hostname,
-    port: Number(url.port) || 6379,
-    password: url.password || undefined,
-    db: Number(url.pathname.replace('/', '') || 0),
-  };
-}
+import Redis from 'ioredis';
 
-export const connection = redisConnection();
+// ─── Connection ───────────────────────────────────────────────────────────────
+export const connection = new Redis(config.REDIS_URL, {
+  maxRetriesPerRequest: null,
+});
 
 // ─── Queue Definitions ────────────────────────────────────────────────────────
 export const emrQueue    = new Queue('emr',    { connection });
 export const webhookQueue = new Queue('webhook', { connection });
+export const broadcastQueue = new Queue('broadcast', { connection });
 
 // ─── Job Type Registry ────────────────────────────────────────────────────────
 export type EMRJobData = {
@@ -30,6 +24,12 @@ export type EMRJobData = {
 export type WebhookJobData = {
   channel: string;
   body: Record<string, unknown>;
+  requestId?: string;
+};
+
+export type BroadcastJobData = {
+  broadcastId: string;
+  businessId: string;
   requestId?: string;
 };
 

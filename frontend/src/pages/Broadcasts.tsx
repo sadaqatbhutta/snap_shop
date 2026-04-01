@@ -6,7 +6,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   Megaphone, Plus, Search, Filter, Calendar, Clock, CheckCircle2,
-  AlertCircle, MoreVertical, Users, FileText, TrendingUp, X, Loader2
+  AlertCircle, MoreVertical, Users, FileText, TrendingUp, X, Loader2,
+  Send, Trash2 as Trash
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Link } from 'react-router-dom';
@@ -65,6 +66,23 @@ export default function Broadcasts() {
     setForm({ name: '', templateId: '', segmentId: '', scheduledAt: '' });
   };
 
+  const handleSendNow = async (broadcastId: string) => {
+    if (!businessId || !confirm('Are you sure you want to send this broadcast now?')) return;
+    try {
+      const resp = await fetch(`/api/broadcast/${broadcastId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ businessId }),
+      });
+      if (!resp.ok) throw new Error('Failed to trigger broadcast');
+      const data = await resp.json();
+      alert(data.scheduled ? 'Broadcast scheduled successfully!' : 'Broadcast started!');
+    } catch (err) {
+      console.error(err);
+      alert('Error triggering broadcast');
+    }
+  };
+
   const filtered = broadcasts.filter(b => activeTab === 'all' || b.status === activeTab);
 
   return (
@@ -72,16 +90,16 @@ export default function Broadcasts() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Broadcasts</h1>
-          <p className="text-gray-500">Send bulk messages to your customer segments.</p>
+          <p className="text-gray-500 text-sm">Send bulk messages to your customer segments.</p>
         </div>
         <div className="flex gap-3">
-          <Link to="/segments" className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
-            <Users className="w-4 h-4" /> Segments
+          <Link to="/segments" className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all">
+            <Users className="w-4 h-4 text-indigo-500" /> Segments
           </Link>
-          <Link to="/templates" className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
-            <FileText className="w-4 h-4" /> Templates
+          <Link to="/templates" className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all">
+            <FileText className="w-4 h-4 text-indigo-500" /> Templates
           </Link>
-          <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">
+          <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 px-6 py-2 text-sm font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all">
             <Plus className="w-4 h-4" /> New Broadcast
           </button>
         </div>
@@ -90,16 +108,16 @@ export default function Broadcasts() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
           { label: 'Total Broadcasts', value: broadcasts.length, icon: Megaphone, bg: 'bg-indigo-50', color: 'text-indigo-600' },
-          { label: 'Messages Sent', value: broadcasts.filter(b => b.status === 'sent').reduce((a, b) => a + b.reach, 0).toLocaleString(), icon: CheckCircle2, bg: 'bg-green-50', color: 'text-green-600' },
+          { label: 'Messages Sent', value: broadcasts.filter(b => b.status === 'sent').reduce((a, b) => a + (b.reach || 0), 0).toLocaleString(), icon: CheckCircle2, bg: 'bg-green-50', color: 'text-green-600' },
           { label: 'Scheduled', value: broadcasts.filter(b => b.status === 'scheduled').length, icon: TrendingUp, bg: 'bg-orange-50', color: 'text-orange-600' },
         ].map(s => (
-          <div key={s.label} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+          <div key={s.label} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm transition-hover hover:shadow-md">
             <div className="flex items-center gap-4">
-              <div className={cn('p-3 rounded-lg', s.bg)}>
+              <div className={cn('p-3 rounded-xl', s.bg)}>
                 <s.icon className={cn('w-6 h-6', s.color)} />
               </div>
               <div>
-                <p className="text-sm text-gray-500">{s.label}</p>
+                <p className="text-xs font-semibold text-gray-400 mb-0.5">{s.label}</p>
                 <p className="text-2xl font-bold text-gray-900">{s.value}</p>
               </div>
             </div>
@@ -107,15 +125,15 @@ export default function Broadcasts() {
         ))}
       </div>
 
-      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
-        <div className="flex bg-gray-100 p-1 rounded-lg">
+      <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between">
+        <div className="flex bg-gray-50 p-1 rounded-xl">
           {['all', 'sent', 'scheduled', 'draft'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={cn(
-                'px-4 py-1.5 text-xs font-medium rounded-md capitalize transition-all',
-                activeTab === tab ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                'px-6 py-2 text-xs font-bold rounded-lg capitalize transition-all',
+                activeTab === tab ? 'bg-white text-indigo-600 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-600'
               )}
             >
               {tab}
@@ -124,85 +142,93 @@ export default function Broadcasts() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {filtered.length === 0 ? (
-          <div className="p-12 text-center">
-            <Megaphone className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500 text-sm">No broadcasts yet. Create one to get started.</p>
+          <div className="p-20 text-center opacity-50">
+            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Megaphone className="w-8 h-8 text-gray-300" />
+            </div>
+            <p className="text-gray-500 text-sm font-medium italic">No broadcasts found in this category.</p>
           </div>
         ) : (
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Template & Segment</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Reach</th>
-                <th className="px-6 py-4" />
+              <tr className="bg-gray-50/50 border-b border-gray-100">
+                <th className="px-6 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Info</th>
+                <th className="px-6 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Configuration</th>
+                <th className="px-6 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Status</th>
+                <th className="px-6 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Date</th>
+                <th className="px-6 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right">Reach</th>
+                <th className="px-6 py-5" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-50">
               {filtered.map(bc => (
-                <tr key={bc.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900">{bc.name}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-sm text-gray-700 flex items-center gap-1"><FileText className="w-3 h-3 text-gray-400" /> {bc.templateName || '—'}</span>
-                      <span className="text-xs text-gray-500 flex items-center gap-1"><Users className="w-3 h-3 text-gray-400" /> {bc.segmentName || '—'}</span>
+                <tr key={bc.id} className="group hover:bg-indigo-50/20 transition-all">
+                  <td className="px-6 py-5">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">{bc.name}</span>
+                      <span className="text-[10px] text-gray-400 font-mono">ID: {bc.id.slice(0, 8)}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-5">
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center gap-1.5 px-2 py-0.5 bg-gray-50 rounded border border-gray-100 w-fit">
+                        <FileText className="w-3 h-3 text-indigo-400" />
+                        <span className="text-[11px] font-bold text-gray-600">{bc.templateName || 'Untitled Template'}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 px-2 py-0.5 bg-gray-50 rounded border border-gray-100 w-fit">
+                        <Users className="w-3 h-3 text-emerald-400" />
+                        <span className="text-[11px] font-bold text-gray-600 italic">{bc.segmentName || 'All Customers'}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-5 text-center">
                     <span className={cn(
-                      'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium capitalize',
-                      bc.status === 'sent' ? 'bg-green-100 text-green-700' :
-                      bc.status === 'scheduled' ? 'bg-blue-100 text-blue-700' :
-                      'bg-gray-100 text-gray-700'
+                      'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter shadow-sm',
+                      bc.status === 'sent' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                      bc.status === 'scheduled' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' :
+                      bc.status === 'failed' ? 'bg-red-50 text-red-700 border border-red-100' :
+                      'bg-gray-100 text-gray-600 border border-gray-200'
                     )}>
                       {bc.status === 'sent' && <CheckCircle2 className="w-3 h-3" />}
                       {bc.status === 'scheduled' && <Clock className="w-3 h-3" />}
-                      {bc.status === 'draft' && <AlertCircle className="w-3 h-3" />}
                       {bc.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-gray-400" />
-                      {bc.sentAt || bc.scheduledAt ? new Date(bc.sentAt || bc.scheduledAt!).toLocaleDateString() : new Date(bc.createdAt).toLocaleDateString()}
+                  <td className="px-6 py-5 text-center">
+                    <div className="flex flex-col items-center">
+                      <span className="text-sm font-bold text-gray-700">
+                        {bc.sentAt || bc.scheduledAt ? new Date(bc.sentAt || bc.scheduledAt!).toLocaleDateString() : new Date(bc.createdAt).toLocaleDateString()}
+                      </span>
+                      <span className="text-[10px] text-gray-400">
+                        {bc.sentAt || bc.scheduledAt ? new Date(bc.sentAt || bc.scheduledAt!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Drafted'}
+                      </span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900">{bc.reach.toLocaleString()}</td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      {bc.status === 'draft' && (
+                  <td className="px-6 py-5 text-right font-black text-indigo-600 text-lg">
+                    {bc.reach.toLocaleString()}
+                  </td>
+                  <td className="px-6 py-5 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      {bc.status !== 'sent' && (
                         <button
-                          onClick={() => {
-                            import('firebase/firestore').then(({ doc, updateDoc }) =>
-                              updateDoc(doc(db, `businesses/${businessId}/broadcasts`, bc.id), { status: 'scheduled', scheduledAt: new Date(Date.now() + 3600000).toISOString() })
-                            );
-                          }}
-                          className="px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100"
-                        >Schedule</button>
+                          onClick={() => handleSendNow(bc.id)}
+                          className="flex items-center gap-1.5 px-4 py-2 text-xs font-black bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 active:scale-95 transition-all shadow-md shadow-indigo-100"
+                        >
+                          <Send className="w-3.5 h-3.5" /> Send Now
+                        </button>
                       )}
-                      {bc.status === 'scheduled' && (
-                        <button
-                          onClick={() => {
-                            import('firebase/firestore').then(({ doc, updateDoc }) =>
-                              updateDoc(doc(db, `businesses/${businessId}/broadcasts`, bc.id), { status: 'sent', sentAt: new Date().toISOString() })
-                            );
-                          }}
-                          className="px-2 py-1 text-xs font-medium text-green-600 bg-green-50 rounded hover:bg-green-100"
-                        >Mark Sent</button>
-                      )}
+                      
                       <button
                         onClick={async () => {
-                          if (!confirm('Delete this broadcast?')) return;
+                          if (!confirm('Delete this broadcast archive?')) return;
                           const { doc, deleteDoc } = await import('firebase/firestore');
                           await deleteDoc(doc(db, `businesses/${businessId}/broadcasts`, bc.id));
                         }}
-                        className="p-2 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-600"
+                        className="p-2.5 hover:bg-red-50 rounded-xl text-gray-400 hover:text-red-600 transition-colors"
                       >
-                        <MoreVertical className="w-5 h-5" />
+                        <Trash className="w-5 h-5" />
                       </button>
                     </div>
                   </td>

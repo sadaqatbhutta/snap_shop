@@ -3,15 +3,15 @@ import {
   Settings as SettingsIcon, Lock, Globe, CreditCard, ChevronRight,
   Mail, AlertTriangle, PhoneCall, Clock, Save, Loader2, CheckCircle2,
   X, Copy, Check, Phone, MessageSquare, Facebook, Instagram, ExternalLink,
-  Eye, EyeOff, KeyRound
+  Eye, EyeOff, KeyRound, Users, UserPlus
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useBusiness } from '../context/BusinessContext';
 import { db, auth } from '../firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 
-type Panel = null | 'integrations' | 'security' | 'billing';
+type Panel = null | 'integrations' | 'security' | 'billing' | 'team';
 
 // ─── Integrations Panel ───────────────────────────────────────────────────────
 function IntegrationsPanel({ businessId, onClose }: { businessId: string; onClose: () => void }) {
@@ -325,6 +325,109 @@ function BillingPanel({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ─── Team Panel ───────────────────────────────────────────────────────────────
+function TeamPanel({ businessId, onClose }: { businessId: string; onClose: () => void }) {
+  const [agents, setAgents] = useState<any[]>([]);
+  const [invites, setInvites] = useState<any[]>([]);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [role, setRole] = useState<'admin' | 'agent'>('agent');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!businessId) return;
+    const unsubs = [
+      onSnapshot(collection(db, `businesses/${businessId}/agents`), snap => 
+        setAgents(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      ),
+      onSnapshot(query(collection(db, `businesses/${businessId}/invites`), orderBy('createdAt', 'desc')), snap => 
+        setInvites(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      ),
+    ];
+    return () => unsubs.forEach(u => u());
+  }, [businessId]);
+
+  const handleInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const resp = await fetch('/api/team/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+        body: JSON.stringify({ businessId, email: inviteEmail, role }),
+      });
+      if (!resp.ok) throw new Error();
+      setInviteEmail('');
+      alert('Invitation sent!');
+    } catch {
+      alert('Failed to send invite');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col border border-gray-100">
+        <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-indigo-600 text-white">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md"><Users className="w-8 h-8" /></div>
+            <div>
+              <h2 className="text-2xl font-black">Team Management</h2>
+              <p className="text-indigo-100 text-sm font-medium">Manage agents and administrators</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-full transition-all group"><X className="w-6 h-6 group-rotate-90 transition-transform" /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-8 space-y-10">
+          <section className="space-y-6">
+            <h3 className="text-lg font-black text-gray-900 flex items-center gap-2 px-1"><UserPlus className="w-5 h-5 text-indigo-600" /> Invite Teammate</h3>
+            <form onSubmit={handleInvite} className="flex flex-col md:flex-row gap-4 p-6 bg-gray-50 rounded-3xl border border-gray-100 shadow-sm transition-all hover:bg-white hover:shadow-md">
+              <input required type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="colleague@company.com" className="flex-1 px-5 py-3 bg-white border border-gray-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-medium text-sm" />
+              <select value={role} onChange={e => setRole(e.target.value as any)} className="w-full md:w-32 px-4 py-3 bg-white border border-gray-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 outline-none font-bold text-sm">
+                <option value="agent">Agent</option>
+                <option value="admin">Admin</option>
+              </select>
+              <button type="submit" disabled={loading} className="px-8 py-3.5 bg-indigo-600 text-white rounded-2xl font-black text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-100 disabled:opacity-50 transition-all active:scale-95">{loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Send Invite'}</button>
+            </form>
+          </section>
+
+          <section className="space-y-4">
+            <h3 className="text-lg font-black text-gray-900 px-1">Active Team ({agents.length})</h3>
+            <div className="grid gap-3">
+              {agents.map(agent => (
+                <div key={agent.id} className="flex items-center justify-between p-5 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow group">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center font-black text-lg">{agent.name?.[0] || 'A'}</div>
+                    <div className="flex flex-col"><span className="font-bold text-gray-900">{agent.name}</span><span className="text-xs text-gray-400 font-medium">{agent.email}</span></div>
+                  </div>
+                  <span className={cn('px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest', agent.role === 'admin' ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700')}>{agent.role}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {invites.filter(i => !i.used).length > 0 && (
+            <section className="space-y-4">
+              <h3 className="text-lg font-black text-gray-400 italic px-1">Pending Invitations</h3>
+              <div className="grid gap-3 opacity-60">
+                {invites.filter(i => !i.used).map(invite => (
+                  <div key={invite.id} className="flex items-center justify-between p-4 border border-dashed border-gray-200 rounded-2xl">
+                    <div className="flex items-center gap-3"><Mail className="w-5 h-5 text-gray-400" /><div><p className="text-sm font-bold text-gray-600">{invite.email}</p><p className="text-[10px] text-gray-400">Expires {new Date(invite.expiresAt).toLocaleDateString()}</p></div></div>
+                    <button onClick={async () => { if (!confirm('Revoke?')) return; await deleteDoc(doc(db, `businesses/${businessId}/invites`, invite.id)); }} className="text-[10px] font-black text-red-500 hover:text-red-600 px-4 py-2 hover:bg-red-50 rounded-xl transition-colors uppercase tracking-widest">Revoke</button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
+        <div className="p-8 border-t border-gray-100 bg-gray-50/50"><button onClick={onClose} className="w-full py-4 bg-white border border-gray-200 text-gray-700 rounded-2xl font-black text-base hover:bg-gray-50 transition-all shadow-sm">Done</button></div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Settings Page ───────────────────────────────────────────────────────
 export default function Settings() {
   const { business, businessId, refreshBusiness } = useBusiness();
@@ -358,9 +461,10 @@ export default function Settings() {
     setNotifications(prev => ({ ...prev, [key]: !prev[key] }));
 
   const sections = [
-    { icon: Lock, label: 'Security', description: 'Manage your password and account security.', panel: 'security' as Panel },
-    { icon: Globe, label: 'Integrations', description: 'Connect WhatsApp, Instagram, and other channels.', panel: 'integrations' as Panel },
-    { icon: CreditCard, label: 'Billing', description: 'Manage your subscription and payment methods.', panel: 'billing' as Panel },
+    { icon: Lock, label: 'Security', description: 'Manage your password and account security.', panel: 'security' as const },
+    { icon: Users, label: 'Team', description: 'Collaborate with agents and admins.', panel: 'team' as const },
+    { icon: Globe, label: 'Integrations', description: 'Connect WhatsApp, Instagram, and more.', panel: 'integrations' as const },
+    { icon: CreditCard, label: 'Billing', description: 'Manage your subscription and payments.', panel: 'billing' as const },
   ];
 
   return (
@@ -487,6 +591,9 @@ export default function Settings() {
       )}
       {activePanel === 'billing' && (
         <BillingPanel onClose={() => setActivePanel(null)} />
+      )}
+      {activePanel === 'team' && businessId && (
+        <TeamPanel businessId={businessId} onClose={() => setActivePanel(null)} />
       )}
     </div>
   );

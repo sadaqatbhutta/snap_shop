@@ -7,6 +7,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   updateProfile,
+  sendEmailVerification,
 } from 'firebase/auth';
 import { auth } from '../firebase';
 
@@ -27,6 +28,7 @@ export async function registerWithEmail(email: string, pass: string, displayName
   if (displayName?.trim()) {
     await updateProfile(result.user, { displayName: displayName.trim() });
   }
+  await sendEmailVerification(result.user);
   return result.user;
 }
 

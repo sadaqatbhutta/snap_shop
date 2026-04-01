@@ -10,6 +10,7 @@ import AISettings from './pages/AISettings';
 import CRM from './pages/CRM';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
+import Join from './pages/Join';
 import AuthGuard from './components/AuthGuard';
 import { BusinessProvider } from './context/BusinessContext';
 
@@ -29,6 +30,7 @@ export default function App() {
               <Route path="/ai-settings" element={<AISettings />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/join" element={<Join />} />
             </Routes>
           </Layout>
         </BusinessProvider>

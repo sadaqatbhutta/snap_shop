@@ -103,11 +103,21 @@ Inbound Message (any channel)
 ```
 
 ### Webhook Integration
-Send a POST request to trigger the AI pipeline:
+Send a POST request to trigger the AI pipeline. You MUST include an `X-Snap-Signature` header containing the HMAC-SHA256 signature of the raw request body using your `WEBHOOK_SECRET`.
 
+Example Node.js signature generation:
+```javascript
+const crypto = require('crypto');
+const bodyString = JSON.stringify(payload);
+const signature = crypto.createHmac('sha256', process.env.WEBHOOK_SECRET)
+                        .update(bodyString)
+                        .digest('hex');
 ```
+
+```http
 POST http://localhost:3000/api/webhook/whatsapp
 Content-Type: application/json
+X-Snap-Signature: <your_generated_signature>
 
 {
   "business_id": "your-business-id",

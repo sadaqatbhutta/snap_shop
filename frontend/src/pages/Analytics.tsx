@@ -28,42 +28,53 @@ export default function Analytics() {
     if (!businessId) return;
 
     async function load() {
-      const convSnap = await getDocs(
-        query(collection(db, `businesses/${businessId}/conversations`), orderBy('createdAt', 'desc'), limit(200))
+      // 1. Fetch pre-aggregated daily stats (Last 30 days)
+      const statsSnap = await getDocs(
+        query(collection(db, `businesses/${businessId}/stats`), orderBy('__name__', 'desc'), limit(30))
       );
+      
+      // 2. Fetch recent conversations (Last 200 - for channel/escalation breakdown)
+      const convSnap = await getDocs(
+        query(collection(db, `businesses/${businessId}/conversations`), orderBy('updatedAt', 'desc'), limit(200))
+      );
+
+      const statsDocs = statsSnap.docs.map(d => ({ date: d.id.replace('daily_', ''), ...d.data() }));
       const convs = convSnap.docs.map(d => d.data() as Conversation);
 
-      // Conversations by day (last 12 days)
+      // Aggregates from stats
       const convsByDay = Array(12).fill(0);
-      const now = Date.now();
-      convs.forEach(c => {
-        const daysAgo = Math.floor((now - new Date(c.createdAt).getTime()) / 86400000);
-        if (daysAgo < 12) convsByDay[11 - daysAgo]++;
+      const now = new Date();
+      let aggregatedTotalMessages = 0;
+      const aggregatedIntents: Record<string, number> = {};
+
+      statsDocs.forEach(s => {
+        const date = new Date(s.date);
+        const diffDays = Math.floor((now.getTime() - date.getTime()) / 86400000);
+        if (diffDays < 12) {
+          convsByDay[11 - diffDays] = (s as any).totalConversations || 0;
+        }
+        aggregatedTotalMessages += (s as any).totalMessages || 0;
+        
+        const intents = (s as any).intentCounts || {};
+        Object.entries(intents).forEach(([intent, count]) => {
+          aggregatedIntents[intent] = (aggregatedIntents[intent] || 0) + (count as number);
+        });
       });
 
-      // Channel distribution
+      // Breakdowns from existing convs (Fallback until new stats accumulate)
       const channelCounts: Record<string, number> = {};
       convs.forEach(c => { channelCounts[c.channel] = (channelCounts[c.channel] || 0) + 1; });
 
-      // Escalation rate
       const escalated = convs.filter(c => c.status === 'human_escalated').length;
       const escalationRate = convs.length ? Math.round((escalated / convs.length) * 100) : 0;
 
-      // Intent counts from messages (sample last 100 messages across all convs)
-      const intentCounts: Record<string, number> = {};
-      let totalMessages = 0;
-      for (const conv of convs.slice(0, 20)) {
-        const msgSnap = await getDocs(
-          query(collection(db, `businesses/${businessId}/conversations/${conv.id}/messages`), limit(10))
-        );
-        msgSnap.docs.forEach(d => {
-          totalMessages++;
-          const intent = (d.data() as Message).intent;
-          if (intent) intentCounts[intent] = (intentCounts[intent] || 0) + 1;
-        });
-      }
-
-      setStats({ convsByDay, intentCounts, channelCounts, totalMessages, escalationRate });
+      setStats({
+        convsByDay,
+        intentCounts: aggregatedIntents,
+        channelCounts,
+        totalMessages: aggregatedTotalMessages,
+        escalationRate
+      });
       setLoading(false);
     }
 
