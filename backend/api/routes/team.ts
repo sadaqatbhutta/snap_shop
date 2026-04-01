@@ -1,12 +1,10 @@
 import { Router } from 'express';
-import { getFirestore } from 'firebase-admin/firestore';
-import { getAuth } from 'firebase-admin/auth';
+import { db, auth } from '../../core/firebase';
 import { config } from '../../core/config';
 import crypto from 'crypto';
 import axios from 'axios';
 
 export const teamRouter = Router();
-const db = getFirestore();
 
 /**
  * POST /api/team/invite
@@ -22,7 +20,7 @@ teamRouter.post('/invite', async (req, res, next) => {
     }
 
     const idToken = authHeader.split(' ')[1];
-    const decodedToken = await getAuth().verifyIdToken(idToken);
+    const decodedToken = await auth.verifyIdToken(idToken);
     const callerEmail = decodedToken.email;
 
     // 1. Verify caller is business owner
@@ -52,13 +50,15 @@ teamRouter.post('/invite', async (req, res, next) => {
     const inviteUrl = `${config.APP_URL}/join?token=${token}`;
     
     try {
-      await axios.post(config.SMTP_API_URL, {
-        to: email,
-        subject: `Join ${businessData?.name || 'our team'} on SnapShop AI`,
-        content: `You've been invited as an ${role}. Join here: ${inviteUrl}`,
-      });
+      if (config.SMTP_API_URL) {
+        await axios.post(config.SMTP_API_URL, {
+          to: email,
+          subject: `Join ${businessData?.name || 'our team'} on SnapShop AI`,
+          content: `You've been invited as an ${role}. Join here: ${inviteUrl}`,
+        });
+      }
     } catch (err) {
-      console.warn('Failed to send invite email (SMTP_API_URL placeholder):', err);
+      console.warn('Failed to send invite email:', err);
     }
 
     res.json({ inviteUrl, token });
@@ -81,7 +81,7 @@ teamRouter.post('/accept', async (req, res, next) => {
     }
 
     const idToken = authHeader.split(' ')[1];
-    const decodedToken = await getAuth().verifyIdToken(idToken);
+    const decodedToken = await auth.verifyIdToken(idToken);
     const { uid, email, name } = decodedToken;
 
     // 1. Find invite across all businesses
@@ -93,7 +93,7 @@ teamRouter.post('/accept', async (req, res, next) => {
 
     const inviteDoc = inviteQuery.docs[0];
     const inviteData = inviteDoc.data();
-    const businessId = inviteDoc.ref.parent.parent?.id;
+    const businessId = (inviteDoc.ref.parent.parent as any)?.id;
 
     if (!businessId) throw new Error('Could not resolve businessId from invite path');
 

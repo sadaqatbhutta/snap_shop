@@ -1,23 +1,16 @@
 import { v4 as uuidv4 } from 'uuid';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 import { GoogleGenAI, Type } from '@google/genai';
-import { getApps, initializeApp } from 'firebase-admin/app';
+import { db } from '../core/firebase';
 import { config } from '../core/config';
 import { log } from '../core/logger';
 import { normalizeMetaPayload } from './metaNormalizer';
 import { sendMessage } from './channelSender';
-
-if (!getApps().length) initializeApp({ projectId: config.VITE_FIREBASE_PROJECT_ID });
-const db  = getFirestore();
-const ai  = new GoogleGenAI({ apiKey: config.GEMINI_API_KEY });
-
 import { connection } from '../core/queue';
 
 // ─── Deduplication ────────────────────────────────────────────────────────────
 export async function isDuplicateAsync(id: string): Promise<boolean> {
-  // SET with NX (Only set if not exists) and EX (Expire after 60 seconds)
   const result = await connection.set(`dedup:${id}`, '1', 'EX', 60, 'NX');
-  // Returns true (duplicate) if SET returned null (key already existed)
   return result === null;
 }
 
@@ -77,6 +70,8 @@ FAQs: ${(biz.faqs || []).join('\n')}`;
   };
 }
 
+const ai  = new GoogleGenAI({ apiKey: config.GEMINI_API_KEY });
+
 // ─── Core Pipeline ────────────────────────────────────────────────────────────
 export async function processWebhookJob(
   channel: string,
@@ -101,12 +96,10 @@ export async function processWebhookJob(
   const content    = payload.message;
   const now        = new Date().toISOString();
 
-  // Step 1 — Deduplication
   if (await isDuplicateAsync(msgId)) {
     return { status: 'duplicate', id: msgId, conversationId: '', reply: '', intent: '', confidence: 0 };
   }
 
-  // Step 2 — Find or create customer
   const customersRef = db.collection(`businesses/${businessId}/customers`);
   const custSnap = await customersRef
     .where('externalId', '==', userId)
@@ -130,7 +123,6 @@ export async function processWebhookJob(
     await custSnap.docs[0].ref.update({ lastInteractionAt: now });
   }
 
-  // Step 3 — Find or create active conversation
   const convsRef = db.collection(`businesses/${businessId}/conversations`);
   const convSnap = await convsRef
     .where('customerId', '==', customerId)
@@ -158,7 +150,6 @@ export async function processWebhookJob(
     await convSnap.docs[0].ref.update({ lastMessage: content, updatedAt: now });
   }
 
-  // Step 4 — Store inbound message
   const messagesRef = db.collection(
     `businesses/${businessId}/conversations/${conversationId}/messages`
   );
@@ -170,7 +161,6 @@ export async function processWebhookJob(
     timestamp: now,
   });
 
-  // Step 5 — Load history
   const historySnap = await messagesRef
     .orderBy('timestamp', 'desc')
     .limit(10)
@@ -184,7 +174,6 @@ export async function processWebhookJob(
       content: d.data().content as string,
     }));
 
-  // Step 6 — AI Decision Engine
   let aiReply      = 'Let me connect you with a human agent.';
   let aiIntent     = 'unknown';
   let aiConfidence = 0;
@@ -214,7 +203,6 @@ export async function processWebhookJob(
         updatedAt: new Date().toISOString(),
       });
 
-      // Step 7 — Send outbound reply
       await sendMessage(channel, userId, aiReply, businessId);
     }
   }
@@ -229,7 +217,6 @@ export async function processWebhookJob(
     confidence: Math.round(aiConfidence * 100),
   });
 
-  // Step 8 — Update Stats Aggregation
   const today = new Date().toISOString().split('T')[0];
   const statsRef = db.doc(`businesses/${businessId}/stats/daily_${today}`);
   
@@ -244,7 +231,6 @@ export async function processWebhookJob(
     statsUpdate.totalConversations = FieldValue.increment(1);
   }
 
-  // Check if we just escalated in this job
   const justEscalated = !isHumanHandling && aiReply === 'Let me connect you with a human agent.';
   if (justEscalated) {
     statsUpdate.escalations = FieldValue.increment(1);
@@ -253,61 +239,4 @@ export async function processWebhookJob(
   await statsRef.set(statsUpdate, { merge: true });
 
   return { status: 'processed', id: msgId, conversationId, reply: aiReply, intent: aiIntent, confidence: aiConfidence };
-}
-
-// ─── Inline Local Test Runner ────────────────────────────────────────────────
-if (typeof process !== 'undefined' && process.argv[1] && process.argv[1].endsWith('webhook_service.ts')) {
-  console.log('\n🚀 Running webhook_service.ts directly...');
-  console.log('Replacing Firestore and Gemini with mocks so it works without credentials!');
-  
-  // 1. Mock the Firestore Database instance perfectly
-  const mockChain = () => {
-    const chain: any = {
-      where: () => chain,
-      limit: () => chain,
-      orderBy: () => chain,
-      get: async () => ({ empty: true, docs: [] }), // simulates new customer/conversation
-      doc: (id?: string) => ({
-        get: async () => ({
-          data: () => ({ name: 'SnapShop Demo Biz', aiContext: 'Mock context', faqs: ['Refund policy: 30 days'] })
-        }),
-        set: async () => {},
-        update: async () => {}
-      })
-    };
-    return chain;
-  };
-  (db as any).collection = () => mockChain();
-  (db as any).doc = () => mockChain().doc();
-
-  // 2. Mock the Gemini AI instance
-  (ai as any).models = {
-    generateContent: async () => ({
-      text: JSON.stringify({
-        intent: 'greeting',
-        language: 'english',
-        confidence: 0.95,
-        reply: 'Hello from the SnapShop Mock AI! I can help you with anything.',
-        shouldEscalate: false
-      })
-    })
-  };
-
-  // 3. Run the pipeline with the provided test number
-  console.log('\n⚡ Dispatching test job pipeline...');
-  processWebhookJob('whatsapp', {
-    message_id: 'test-12345',
-    business_id: 'demo-biz',
-    user_id: '+923011284483',
-    message: 'Hello, what is your refund policy?',
-    type: 'text'
-  })
-    .then(result => {
-      console.log('\n✅ Pipeline Result:', result);
-      process.exit(0);
-    })
-    .catch(err => {
-      console.error('\n❌ Error:', err);
-      process.exit(1);
-    });
 }

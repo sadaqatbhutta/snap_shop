@@ -7,6 +7,14 @@ import Redis from 'ioredis';
 // ─── Connection ───────────────────────────────────────────────────────────────
 export const connection = new Redis(config.REDIS_URL, {
   maxRetriesPerRequest: null,
+  lazyConnect: true, // Don't crash immediately if Redis is missing
+});
+
+connection.on('error', (err) => {
+  // Silent warning for dev
+  if (config.NODE_ENV === 'development') {
+    console.warn('⚠️  Redis connection failed. Background queues will be inactive.');
+  }
 });
 
 // ─── Queue Definitions ────────────────────────────────────────────────────────

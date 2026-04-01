@@ -1,10 +1,8 @@
-import { getFirestore } from 'firebase-admin/firestore';
 import { BroadcastJobData } from '../core/queue';
 import { sendMessage } from './channelSender';
 import { log } from '../core/logger';
 import { Broadcast, Segment, Customer } from '../../shared/types';
-
-const db = getFirestore();
+import { db } from '../core/firebase';
 
 /**
  * Processes a broadcast job: filters customers by segment and sends messages.
@@ -38,15 +36,15 @@ export async function processBroadcastJob(data: BroadcastJobData) {
     const content = template?.content || '';
 
     // 4. Query Customers
-    let resultsRef: FirebaseFirestore.Query = db.collection(`businesses/${businessId}/customers`);
+    let resultsRef: any = db.collection(`businesses/${businessId}/customers`);
     
     // Apply basic Firestore filters
     if (segment.criteria.channel) {
       resultsRef = resultsRef.where('channel', '==', segment.criteria.channel);
     }
 
-    const customersSnap = await resultsRef.get();
-    let customers = customersSnap.docs.map(d => ({ id: d.id, ...d.data() } as Customer));
+    const customersSnap = await (resultsRef as any).get();
+    let customers = customersSnap.docs.map((d: any) => ({ id: d.id, ...d.data() } as Customer));
 
     // Apply complex filters in-memory
     const criteria = segment.criteria;

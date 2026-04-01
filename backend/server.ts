@@ -1,15 +1,6 @@
 /**
  * SnapShop Backend Server
  * ─────────────────────────────────────────────
- * Responsibilities:
- *  1. Mount middleware (logging, body parsing, CORS, rate limiting)
- *  2. Mount API routes (webhook, EMR, observability)
- *  3. Register global error handlers
- *  4. Serve Vite dev middleware / static production build
- *
- * All business logic lives in backend/services/
- * All queue logic lives in backend/core/queue.ts
- * Worker runs separately: npm run worker
  */
 
 import express from 'express';
@@ -18,9 +9,9 @@ import bodyParser from 'body-parser';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { initializeApp, getApps } from 'firebase-admin/app';
-
 import helmet from 'helmet';
+
+import { db } from './core/firebase';
 import { config } from './core/config';
 import { requestLogger } from './core/logger';
 import { registerErrorHandlers } from './core/exceptions';
@@ -34,15 +25,14 @@ import { observabilityRouter } from './api/routes/observability';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
-// ─── Firebase Admin Init ──────────────────────────────────────────────────────
-if (!getApps().length) initializeApp();
-
 // ─── Express App ──────────────────────────────────────────────────────────────
 export async function createApp() {
   const app = express();
 
   // ── Global Middleware ──────────────────────────────────────────────────────
-  app.use(helmet());                    // Security headers (HSTS, X-Frame-Options, etc.)
+  if (config.NODE_ENV === 'production') {
+    app.use(helmet());
+  }
   app.disable('x-powered-by');          // Hide Express fingerprint
   app.use(cors());
   app.use(bodyParser.json({
