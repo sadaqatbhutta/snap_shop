@@ -26,15 +26,15 @@ export function normalizeMetaPayload(channel: string, body: any): WebhookPayload
     };
   }
 
-  // Instagram Integration
-  if (channel === 'instagram') {
+  // Instagram or Facebook Integration (identical messaging format)
+  if (channel === 'instagram' || channel === 'facebook') {
     const entry     = body.entry?.[0];
     const messaging = entry?.messaging?.[0];
 
     if (!messaging?.message) return null;
 
     return {
-      business_id: entry?.id || 'default', // Meta generic ID for the IG page
+      business_id: entry?.id || 'default', // Meta generic ID for the IG/FB page
       user_id:     messaging.sender?.id,
       message:     messaging.message?.text || '',
       type:        'text',

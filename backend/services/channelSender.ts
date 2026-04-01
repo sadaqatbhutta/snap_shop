@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { config } from '../core/config';
 import { withRetry } from '../core/retry';
+import { db } from '../core/firebase';
 import { log } from '../core/logger';
 
 /**
@@ -13,13 +14,23 @@ export async function sendMessage(
   businessId: string
 ): Promise<void> {
   const metaApiUrl = 'https://graph.facebook.com/v19.0';
-  const accessToken = config.META_ACCESS_TOKEN;
+  
+  // 1. Resolve Credentials (DB first, then config)
+  const bizDoc = await db.doc(`businesses/${businessId}`).get();
+  const biz = bizDoc.data();
+  
+  const accessToken = biz?.metaAccessToken || config.META_ACCESS_TOKEN;
+  const phoneNumberId = biz?.whatsappPhoneNumberId || config.WHATSAPP_PHONE_NUMBER_ID;
+
+  if (!accessToken) {
+    throw new Error(`Missing Meta Access Token for business ${businessId}`);
+  }
 
   await withRetry(
     async () => {
       if (channel === 'whatsapp') {
-        // WhatsApp Business API
-        const phoneNumberId = config.WHATSAPP_PHONE_NUMBER_ID;
+        if (!phoneNumberId) throw new Error(`Missing WhatsApp Phone Number ID for business ${businessId}`);
+        
         await axios.post(
           `${metaApiUrl}/${phoneNumberId}/messages`,
           {
@@ -34,7 +45,6 @@ export async function sendMessage(
           }
         );
       } else if (channel === 'instagram') {
-        // Instagram Messaging API
         await axios.post(
           `${metaApiUrl}/me/messages`,
           {
@@ -50,7 +60,7 @@ export async function sendMessage(
           timestamp: new Date().toISOString(),
           level: 'warn',
           context: 'channelSender',
-          message: `Attempted to send to unsupported channel: ${channel}`,
+          message: `Unsupported channel: ${channel}`,
           businessId,
         });
       }
