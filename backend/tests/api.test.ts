@@ -16,7 +16,7 @@ function buildTestApp() {
   app.use(requestLogger);
 
   // Rate limit: 3 req per 10s for testing
-  app.use('/api', rateLimiter({ windowMs: 10_000, maxRequests: 3 }));
+  app.use('/api', rateLimiter({ windowMs: 10_000, maxRequests: 3, keyPrefix: 'rl_test' }));
 
   // Webhook route stub — validates only, no queue
   app.post('/api/webhook/:channel', (req, res, next) => {

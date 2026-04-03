@@ -7,6 +7,7 @@ import { log } from '../core/logger';
 import { normalizeMetaPayload } from './metaNormalizer';
 import { sendMessage } from './channelSender';
 import { connection } from '../core/queue';
+import { Conversation } from '../../shared/types';
 
 // ─── Deduplication ────────────────────────────────────────────────────────────
 export async function isDuplicateAsync(id: string): Promise<boolean> {
@@ -100,55 +101,81 @@ export async function processWebhookJob(
     return { status: 'duplicate', id: msgId, conversationId: '', reply: '', intent: '', confidence: 0 };
   }
 
-  const customersRef = db.collection(`businesses/${businessId}/customers`);
-  const custSnap = await customersRef
-    .where('externalId', '==', userId)
-    .where('channel', '==', channel)
-    .limit(1)
-    .get();
+  const { customerId, conversationId, isNewConversation, isHumanHandling } = await db.runTransaction(async (transaction: FirebaseFirestore.Transaction) => {
+    // 1. READS
+    const customersRef = db.collection(`businesses/${businessId}/customers`);
+    const custSnap = await transaction.get(
+      customersRef.where('externalId', '==', userId).where('channel', '==', channel).limit(1)
+    );
 
-  let customerId: string;
-  if (custSnap.empty) {
-    customerId = uuidv4();
-    await customersRef.doc(customerId).set({
-      id: customerId, businessId, channel,
-      externalId: userId,
-      name: body.name || userId,
-      tags: [],
-      createdAt: now,
-      lastInteractionAt: now,
-    });
-  } else {
-    customerId = custSnap.docs[0].id;
-    await custSnap.docs[0].ref.update({ lastInteractionAt: now });
-  }
+    let tempCustomerId: string;
+    let customerDocRef: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>;
+    let isNewCustomer = false;
+
+    if (custSnap.empty) {
+      tempCustomerId = uuidv4();
+      customerDocRef = customersRef.doc(tempCustomerId);
+      isNewCustomer = true;
+    } else {
+      tempCustomerId = custSnap.docs[0].id;
+      customerDocRef = (custSnap as FirebaseFirestore.QuerySnapshot<FirebaseFirestore.DocumentData>).docs[0].ref;
+    }
+
+    const conversationsRef = db.collection(`businesses/${businessId}/conversations`);
+    const convSnap = await transaction.get(
+      conversationsRef.where('customerId', '==', tempCustomerId).where('status', '==', 'active').limit(1)
+    );
+
+    let tempConversationId: string;
+    let convDocRef: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>;
+    let tempIsNewConversation = false;
+    let tempIsHumanHandling = false;
+
+    if (convSnap.empty) {
+      tempConversationId = uuidv4();
+      convDocRef = conversationsRef.doc(tempConversationId);
+      tempIsNewConversation = true;
+    } else {
+      tempConversationId = convSnap.docs[0].id;
+      convDocRef = (convSnap as FirebaseFirestore.QuerySnapshot<FirebaseFirestore.DocumentData>).docs[0].ref;
+      tempIsHumanHandling = (convSnap.docs[0].data() as any).status === 'human_escalated';
+    }
+
+    // 2. WRITES
+    if (isNewCustomer) {
+      transaction.set(customerDocRef, {
+        id: tempCustomerId, businessId, channel,
+        externalId: userId,
+        name: (body.name as string) || userId,
+        tags: [],
+        createdAt: now,
+        lastInteractionAt: now,
+      });
+    } else {
+      transaction.update(customerDocRef, { lastInteractionAt: now });
+    }
+
+    if (tempIsNewConversation) {
+      transaction.set(convDocRef, {
+        id: tempConversationId, businessId, customerId: tempCustomerId,
+        customerName: (body.name as string) || userId,
+        channel, lastMessage: content,
+        status: 'active',
+        createdAt: now, updatedAt: now,
+      });
+    } else {
+      transaction.update(convDocRef, { lastMessage: content, updatedAt: now });
+    }
+
+    return {
+      customerId: tempCustomerId,
+      conversationId: tempConversationId,
+      isNewConversation: tempIsNewConversation,
+      isHumanHandling: tempIsHumanHandling
+    };
+  });
 
   const convsRef = db.collection(`businesses/${businessId}/conversations`);
-  const convSnap = await convsRef
-    .where('customerId', '==', customerId)
-    .where('status', '==', 'active')
-    .limit(1)
-    .get();
-
-  let conversationId: string;
-  let isHumanHandling = false;
-
-  let isNewConversation = false;
-  if (convSnap.empty) {
-    conversationId = uuidv4();
-    isNewConversation = true;
-    await convsRef.doc(conversationId).set({
-      id: conversationId, businessId, customerId,
-      customerName: body.name || userId,
-      channel, lastMessage: content,
-      status: 'active',
-      createdAt: now, updatedAt: now,
-    });
-  } else {
-    conversationId = convSnap.docs[0].id;
-    isHumanHandling = convSnap.docs[0].data().status === 'human_escalated';
-    await convSnap.docs[0].ref.update({ lastMessage: content, updatedAt: now });
-  }
 
   const messagesRef = db.collection(
     `businesses/${businessId}/conversations/${conversationId}/messages`
@@ -168,8 +195,8 @@ export async function processWebhookJob(
 
   const history = historySnap.docs
     .reverse()
-    .filter(d => d.id !== customerMsgId)
-    .map(d => ({
+    .filter((d: FirebaseFirestore.QueryDocumentSnapshot) => d.id !== customerMsgId)
+    .map((d: FirebaseFirestore.QueryDocumentSnapshot) => ({
       role: (d.data().senderType === 'customer' ? 'user' : 'model') as 'user' | 'model',
       content: d.data().content as string,
     }));
@@ -220,7 +247,7 @@ export async function processWebhookJob(
   const today = new Date().toISOString().split('T')[0];
   const statsRef = db.doc(`businesses/${businessId}/stats/daily_${today}`);
   
-  const statsUpdate: any = {
+  const statsUpdate: Record<string, FieldValue> = {
     totalMessages: FieldValue.increment(1),
     [`channelCounts.${channel}`]: FieldValue.increment(1),
     [`intentCounts.${aiIntent}`]: FieldValue.increment(1),

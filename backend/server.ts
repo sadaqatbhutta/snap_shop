@@ -34,7 +34,42 @@ export async function createApp() {
     app.use(helmet());
   }
   app.disable('x-powered-by');          // Hide Express fingerprint
-  app.use(cors());
+
+  // ── CORS Configuration ─────────────────────────────────────────────────────
+  const allowedOrigins = config.ALLOWED_ORIGINS.split(',').map(o => o.trim());
+
+  app.use(cors({
+    origin: (origin, callback) => {
+      // 1. Always allow in development
+      if (config.NODE_ENV === 'development') {
+        return callback(null, true);
+      }
+      
+      // 2. Allow if origin is empty (non-browser requests)
+      if (!origin) return callback(null, true);
+      
+      // 3. Check allowlist
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      
+      // 4. Reject others in production with HTTP 403 (via middleware below)
+      return callback(new Error('CORS_NOT_ALLOWED'));
+    },
+    credentials: true,
+  }));
+
+  // Handle CORS errors specifically to return 403 Forbidden
+  app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (err.message === 'CORS_NOT_ALLOWED') {
+      return res.status(403).json({ 
+        status: 'error', 
+        code: 'FORBIDDEN', 
+        message: 'Origin not allowed by security policy' 
+      });
+    }
+    next(err);
+  });
   app.use(bodyParser.json({
     verify: (req: any, _res, buf) => {
       req.rawBody = buf;
@@ -46,12 +81,14 @@ export async function createApp() {
   app.use('/api', rateLimiter({
     windowMs:    config.RATE_LIMIT_WINDOW_MS,
     maxRequests: config.RATE_LIMIT_MAX_REQ,
+    keyPrefix:   'rl_global',
   }));
 
   // ── Stricter Rate Limit for EMR (external API protection) ─────────────────
   app.use('/api/emr', rateLimiter({
     windowMs:    config.RATE_LIMIT_WINDOW_MS,
     maxRequests: config.RATE_LIMIT_EMR_MAX_REQ,
+    keyPrefix:   'rl_emr',
   }));
 
   // ── API Routes ─────────────────────────────────────────────────────────────
@@ -93,4 +130,7 @@ async function startServer() {
   });
 }
 
-startServer();
+// Start server only when run directly (node server.ts), not when imported in tests
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  startServer();
+}

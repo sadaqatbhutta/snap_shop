@@ -16,6 +16,7 @@ const ConfigSchema = z.object({
   
   // Security
   WEBHOOK_SECRET:               z.string().min(32, 'WEBHOOK_SECRET is required and must be at least 32 characters'),
+  ALLOWED_ORIGINS:              z.string().default('http://localhost:5173'),
   
   // Firebase Frontend Config (Validated at startup)
   VITE_FIREBASE_API_KEY:        z.string().min(1, 'VITE_FIREBASE_API_KEY is required'),

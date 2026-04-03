@@ -13,7 +13,8 @@
     "noEmit": true,
     "paths": {
       "@/*": ["./*"]
-    }
+    },
+    "strict": true
   },
   "include": [
     "frontend/src",

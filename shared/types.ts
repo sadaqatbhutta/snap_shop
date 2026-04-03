@@ -44,6 +44,18 @@ export interface Conversation {
   updatedAt: string;
 }
 
+export type MessageType = 
+  | 'text' 
+  | 'image' 
+  | 'audio' 
+  | 'video' 
+  | 'document' 
+  | 'sticker' 
+  | 'location' 
+  | 'contacts' 
+  | 'interactive' 
+  | 'voice';
+
 export interface Message {
   id: string;
   conversationId: string;
@@ -51,7 +63,7 @@ export interface Message {
   senderId: string;
   senderType: 'customer' | 'agent' | 'ai';
   content: string;
-  type: 'text' | 'image' | 'voice';
+  type: MessageType;
   intent?: string;
   timestamp: string;
 }
@@ -81,7 +93,7 @@ export interface Segment {
   name: string;
   description: string;
   criteria: {
-    channel?: string;
+    channel?: Channel;
     tags?: string[];
     tagLogic?: 'AND' | 'OR';
     excludedTags?: string[];

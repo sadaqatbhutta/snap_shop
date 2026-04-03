@@ -4,7 +4,19 @@ import { config } from '../../core/config';
 import crypto from 'crypto';
 import axios from 'axios';
 
+import { z } from 'zod';
+
 export const teamRouter = Router();
+
+const InviteSchema = z.object({
+  businessId: z.string(),
+  email: z.string().email(),
+  role: z.enum(['admin', 'agent'])
+});
+
+const AcceptSchema = z.object({
+  token: z.string()
+});
 
 /**
  * POST /api/team/invite
@@ -12,7 +24,7 @@ export const teamRouter = Router();
  */
 teamRouter.post('/invite', async (req, res, next) => {
   try {
-    const { businessId, email, role } = req.body;
+    const { businessId, email, role } = InviteSchema.parse(req.body);
     const authHeader = req.headers.authorization;
     
     if (!authHeader?.startsWith('Bearer ')) {
@@ -73,7 +85,7 @@ teamRouter.post('/invite', async (req, res, next) => {
  */
 teamRouter.post('/accept', async (req, res, next) => {
   try {
-    const { token } = req.body;
+    const { token } = AcceptSchema.parse(req.body);
     const authHeader = req.headers.authorization;
 
     if (!authHeader?.startsWith('Bearer ')) {

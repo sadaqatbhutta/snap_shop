@@ -35,63 +35,78 @@ export async function processBroadcastJob(data: BroadcastJobData) {
     const template = templateDoc.data();
     const content = template?.content || '';
 
-    // 4. Query Customers
-    let resultsRef: any = db.collection(`businesses/${businessId}/customers`);
+    // 4. Query Customers in Batches
+    let baseQuery: FirebaseFirestore.Query = db.collection(`businesses/${businessId}/customers`).orderBy('createdAt');
     
     // Apply basic Firestore filters
     if (segment.criteria.channel) {
-      resultsRef = resultsRef.where('channel', '==', segment.criteria.channel);
+      baseQuery = baseQuery.where('channel', '==', segment.criteria.channel);
     }
 
-    const customersSnap = await (resultsRef as any).get();
-    let customers = customersSnap.docs.map((d: any) => ({ id: d.id, ...d.data() } as Customer));
-
-    // Apply complex filters in-memory
-    const criteria = segment.criteria;
-    if (criteria.tags && criteria.tags.length > 0) {
-      customers = customers.filter(c => {
-        const hasTags = criteria.tags!.some(t => c.tags.includes(t));
-        const allTags = criteria.tags!.every(t => c.tags.includes(t));
-        return criteria.tagLogic === 'OR' ? hasTags : allTags;
-      });
-    }
-
-    if (criteria.excludedTags && criteria.excludedTags.length > 0) {
-      customers = customers.filter(c => !criteria.excludedTags!.some(t => c.tags.includes(t)));
-    }
-
-    if (criteria.lastInteraction) {
-      const cutoff = new Date(criteria.lastInteraction).getTime();
-      customers = customers.filter(c => new Date(c.lastInteractionAt).getTime() >= cutoff);
-    }
-
-    // 5. Delivery Loop
     let delivered = 0;
     let failed = 0;
+    let lastDoc = null;
+    let hasMore = true;
 
     log({ 
       timestamp: new Date().toISOString(), 
       level: 'info', 
       context: 'broadcast_service', 
-      message: `Delivering to ${customers.length} customers`, 
+      message: 'Starting delivery pipeline (paginated)', 
       broadcastId 
     });
 
-    for (const customer of customers) {
-      try {
-        await sendMessage(customer.channel, customer.externalId, content, businessId);
-        delivered++;
-      } catch (err: any) {
-        failed++;
-        log({
-          timestamp: new Date().toISOString(),
-          level: 'error',
-          context: 'broadcast_service',
-          message: `Failed to send to customer ${customer.id}`,
-          error: err.message,
-          broadcastId,
-          customerId: customer.id,
+    while (hasMore) {
+      let batchQuery = baseQuery.limit(100);
+      if (lastDoc) {
+        batchQuery = batchQuery.startAfter(lastDoc);
+      }
+
+      const batchSnap = await batchQuery.get();
+      if (batchSnap.empty) {
+        hasMore = false;
+        break;
+      }
+
+      lastDoc = batchSnap.docs[batchSnap.docs.length - 1];
+      let batchCustomers = batchSnap.docs.map((d: FirebaseFirestore.QueryDocumentSnapshot) => ({ id: d.id, ...d.data() } as Customer));
+
+      // Apply complex filters in-memory for this batch
+      const criteria = segment.criteria;
+      if (criteria.tags && criteria.tags.length > 0) {
+        batchCustomers = batchCustomers.filter(c => {
+          const hasTags = criteria.tags!.some(t => c.tags.includes(t));
+          const allTags = criteria.tags!.every(t => c.tags.includes(t));
+          return criteria.tagLogic === 'OR' ? hasTags : allTags;
         });
+      }
+
+      if (criteria.excludedTags && criteria.excludedTags.length > 0) {
+        batchCustomers = batchCustomers.filter(c => !criteria.excludedTags!.some(t => c.tags.includes(t)));
+      }
+
+      if (criteria.lastInteraction) {
+        const cutoff = new Date(criteria.lastInteraction).getTime();
+        batchCustomers = batchCustomers.filter(c => new Date(c.lastInteractionAt).getTime() >= cutoff);
+      }
+
+      // Delivery Loop for current batch
+      for (const customer of batchCustomers) {
+        try {
+          await sendMessage(customer.channel, customer.externalId, content, businessId);
+          delivered++;
+        } catch (err: any) {
+          failed++;
+          log({
+            timestamp: new Date().toISOString(),
+            level: 'error',
+            context: 'broadcast_service',
+            message: `Failed to send to customer ${customer.id}`,
+            error: err.message,
+            broadcastId,
+            customerId: customer.id,
+          });
+        }
       }
     }
 

@@ -1,4 +1,12 @@
 import { WebhookPayload } from '../schemas/webhook';
+import { log } from '../core/logger';
+import { MessageType } from '../../shared/types';
+
+const SUPPORTED_TYPES = [
+  'text', 'image', 'audio', 'video', 
+  'document', 'sticker', 'location', 
+  'contacts', 'interactive'
+];
 
 /**
  * Normalizes Meta (WhatsApp/Instagram) webhook payloads into our standard internal schema.
@@ -16,11 +24,23 @@ export function normalizeMetaPayload(channel: string, body: any): WebhookPayload
     const message = value.messages[0];
     const contact = value.contacts?.[0];
 
+    // Identify and map incoming Meta type
+    let internalType = message.type as MessageType;
+    if (!SUPPORTED_TYPES.includes(internalType as string)) {
+      log({ 
+        timestamp: new Date().toISOString(), 
+        level: 'warn', 
+        context: 'meta_normalizer', 
+        message: `Unrecognized WhatsApp message type: ${message.type}. Defaulting to 'text'.` 
+      });
+      internalType = 'text';
+    }
+
     return {
-      business_id: value.metadata?.phone_number_id || 'default', // Meta uses phone_number_id usually
+      business_id: value.metadata?.phone_number_id || 'default', 
       user_id:     message.from,
       message:     message.text?.body || '',
-      type:        message.type === 'text' ? 'text' : 'text', // simplification for now
+      type:        internalType,
       name:        contact?.profile?.name,
       message_id:  message.id,
     };
