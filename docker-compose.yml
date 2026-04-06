@@ -1,0 +1,25 @@
+version: '3.9'
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+
+  backend:
+    build: .
+    command: npx tsx backend/server.ts
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: development
+      REDIS_URL: redis://redis:6379
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+      WEBHOOK_VERIFY_TOKEN: ${WEBHOOK_VERIFY_TOKEN}
+      META_ACCESS_TOKEN: ${META_ACCESS_TOKEN}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID}
+      APP_URL: ${APP_URL}
+    depends_on:
+      - redis

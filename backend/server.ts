@@ -1,136 +1,18 @@
-/**
- * SnapShop Backend Server
- * ─────────────────────────────────────────────
- */
+import { createApp } from './app.js';
+import { config } from './src/config/config.js';
+import { logger } from './src/utils/logger.js';
 
-import express from 'express';
-import cors from 'cors';
-import bodyParser from 'body-parser';
-import { createServer as createViteServer } from 'vite';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import helmet from 'helmet';
-
-import { db } from './core/firebase';
-import { config } from './core/config';
-import { requestLogger } from './core/logger';
-import { registerErrorHandlers } from './core/exceptions';
-import { rateLimiter } from './core/rateLimit';
-import { webhookRouter } from './api/routes/webhook';
-import { emrRouter } from './api/routes/emr';
-import { teamRouter } from './api/routes/team';
-import { broadcastRouter } from './api/routes/broadcast';
-import { observabilityRouter } from './api/routes/observability';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname  = path.dirname(__filename);
-
-// ─── Express App ──────────────────────────────────────────────────────────────
-export async function createApp() {
-  const app = express();
-
-  // ── Global Middleware ──────────────────────────────────────────────────────
-  if (config.NODE_ENV === 'production') {
-    app.use(helmet());
-  }
-  app.disable('x-powered-by');          // Hide Express fingerprint
-
-  // ── CORS Configuration ─────────────────────────────────────────────────────
-  const allowedOrigins = config.ALLOWED_ORIGINS.split(',').map(o => o.trim());
-
-  app.use(cors({
-    origin: (origin, callback) => {
-      // 1. Always allow in development
-      if (config.NODE_ENV === 'development') {
-        return callback(null, true);
-      }
-      
-      // 2. Allow if origin is empty (non-browser requests)
-      if (!origin) return callback(null, true);
-      
-      // 3. Check allowlist
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-      
-      // 4. Reject others in production with HTTP 403 (via middleware below)
-      return callback(new Error('CORS_NOT_ALLOWED'));
-    },
-    credentials: true,
-  }));
-
-  // Handle CORS errors specifically to return 403 Forbidden
-  app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
-    if (err.message === 'CORS_NOT_ALLOWED') {
-      return res.status(403).json({ 
-        status: 'error', 
-        code: 'FORBIDDEN', 
-        message: 'Origin not allowed by security policy' 
-      });
-    }
-    next(err);
-  });
-  app.use(bodyParser.json({
-    verify: (req: any, _res, buf) => {
-      req.rawBody = buf;
-    }
-  }));
-  app.use(requestLogger);
-
-  // ── Global Rate Limit (all /api routes) ───────────────────────────────────
-  app.use('/api', rateLimiter({
-    windowMs:    config.RATE_LIMIT_WINDOW_MS,
-    maxRequests: config.RATE_LIMIT_MAX_REQ,
-    keyPrefix:   'rl_global',
-  }));
-
-  // ── Stricter Rate Limit for EMR (external API protection) ─────────────────
-  app.use('/api/emr', rateLimiter({
-    windowMs:    config.RATE_LIMIT_WINDOW_MS,
-    maxRequests: config.RATE_LIMIT_EMR_MAX_REQ,
-    keyPrefix:   'rl_emr',
-  }));
-
-  // ── API Routes ─────────────────────────────────────────────────────────────
-  app.use('/api/webhook', webhookRouter);
-  app.use('/api/emr',     emrRouter);
-  app.use('/api/team',    teamRouter);
-  app.use('/api/broadcast', broadcastRouter);
-  app.use('/api',         observabilityRouter);  // /api/logs, /api/metrics, /api/health
-
-  // ── Global Error Handlers (must be after all routes) ──────────────────────
-  registerErrorHandlers(app);
-
-  return app;
-}
-
-// ─── Start (only when run directly, not during tests) ─────────────────────────
 async function startServer() {
   const app = await createApp();
 
-  if (config.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      root: path.resolve(__dirname, '../frontend'),
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.resolve(__dirname, '../frontend/dist');
-    app.use(express.static(distPath));
-    app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
-  }
-
   app.listen(config.PORT, '0.0.0.0', () => {
-    console.log(`\n🚀 SnapShop running at http://localhost:${config.PORT}\n`);
-    console.log(`   Workers : run 'npm run worker' to start background job processing`);
-    console.log(`   Logs    : GET /api/logs?status=failure&limit=50`);
-    console.log(`   Metrics : GET /api/metrics`);
-    console.log(`   Health  : GET /api/health\n`);
+    logger.info({ port: config.PORT }, 'SnapShop backend started');
+    if (config.NODE_ENV !== 'production') {
+      logger.info({ docsUrl: `http://localhost:${config.PORT}/api/docs` }, 'Swagger UI available');
+    }
   });
 }
 
-// Start server only when run directly (node server.ts), not when imported in tests
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (process.argv[1] === new URL(import.meta.url).pathname) {
   startServer();
 }

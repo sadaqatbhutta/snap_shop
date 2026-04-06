@@ -1,0 +1,16 @@
+process.env.NODE_ENV ||= 'test';
+process.env.GEMINI_API_KEY ||= 'test-key';
+process.env.WEBHOOK_SECRET ||= 'test-secret-1234567890123456789012345';
+process.env.FIREBASE_PROJECT_ID ||= 'test-project';
+process.env.WEBHOOK_VERIFY_TOKEN ||= 'verify-token';
+process.env.META_ACCESS_TOKEN ||= 'meta-token';
+process.env.WHATSAPP_PHONE_NUMBER_ID ||= '123';
+process.env.REDIS_URL ||= 'redis://localhost:6379';
+process.env.ALLOWED_ORIGINS ||= 'http://localhost:5173';
+process.env.EMR_API_URL ||= 'https://emr.example.com';
+process.env.EMR_TIMEOUT_MS ||= '10000';
+process.env.QUEUE_MAX_RETRIES ||= '3';
+process.env.QUEUE_CONCURRENCY ||= '5';
+process.env.RATE_LIMIT_WINDOW_MS ||= '60000';
+process.env.RATE_LIMIT_MAX_REQ ||= '60';
+process.env.RATE_LIMIT_EMR_MAX_REQ ||= '10';

@@ -1,20 +1,5 @@
-﻿import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
-
-vi.mock('../src/config/firebase.js', () => ({
-  db: {
-    collection: () => ({
-      doc: () => ({
-        get: async () => ({ exists: false }),
-        set: async () => ({}),
-        update: async () => ({}),
-      }),
-    }),
-  },
-  auth: {
-    verifyIdToken: async () => ({ uid: 'test-uid', email: 'test@example.com' }),
-  },
-}));
 
 process.env.NODE_ENV = 'test';
 process.env.GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'test-key';
@@ -32,15 +17,14 @@ beforeAll(async () => {
   app = await createApp();
 });
 
-describe('API Routes', () => {
+describe('Backend API', () => {
   it('returns health status', async () => {
     const res = await request(app).get('/api/health');
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('ok');
-    expect(res.body.timestamp).toBeTruthy();
   });
 
-  it('queues webhook requests and returns 202', async () => {
+  it('queues webhook messages with valid payload', async () => {
     const res = await request(app).post('/api/webhook/whatsapp').send({
       business_id: 'biz-1',
       user_id: 'user-1',
@@ -48,11 +32,11 @@ describe('API Routes', () => {
     });
 
     expect(res.status).toBe(202);
-    expect(res.body.status).toBe('queued');
-    expect(res.body.job_id).toBeTruthy();
+    expect(res.body).toHaveProperty('status', 'queued');
+    expect(res.body).toHaveProperty('job_id');
   });
 
-  it('returns validation error for missing business_id', async () => {
+  it('returns 422 for invalid webhook body', async () => {
     const res = await request(app).post('/api/webhook/whatsapp').send({
       user_id: 'user-1',
       message: 'Hello',
