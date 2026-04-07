@@ -16,7 +16,7 @@ function getClientIp(req: Request) {
 }
 
 export function rateLimiter({ windowMs, maxRequests, keyPrefix = 'rl' }: RateLimitOptions) {
-  if (config.NODE_ENV === 'test' || !connection) {
+  if (!connection) {
     return (_req: Request, _res: Response, next: NextFunction) => next();
   }
 

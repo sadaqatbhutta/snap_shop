@@ -3,18 +3,14 @@ import Redis from 'ioredis';
 import { config } from '../config/config.js';
 import { logger } from '../utils/logger.js';
 
-export const connection = config.NODE_ENV === 'test'
-  ? null
-  : new Redis(config.REDIS_URL, {
-      maxRetriesPerRequest: null,
-      lazyConnect: true,
-    });
+export const connection = new Redis(config.REDIS_URL, {
+  maxRetriesPerRequest: null,
+  lazyConnect: true,
+});
 
-if (connection) {
-  connection.on('error', err => {
-    logger.warn({ error: err?.message ?? String(err) }, 'Redis connection error');
-  });
-}
+connection.on('error', err => {
+  logger.warn({ error: err?.message ?? String(err) }, 'Redis connection error');
+});
 
 export const defaultJobOptions: JobsOptions = {
   attempts: config.QUEUE_MAX_RETRIES,
@@ -24,15 +20,6 @@ export const defaultJobOptions: JobsOptions = {
 };
 
 function createQueue<T>(name: string) {
-  if (config.NODE_ENV === 'test') {
-    return {
-      add: async (_name: string, data: T, _opts?: JobsOptions) => ({
-        id: `test-${name}-${Date.now()}`,
-        data,
-      }),
-      getWaitingCount: async () => 0,
-    } as any;
-  }
   return new Queue<T>(name, { connection: connection as Redis.Redis });
 }
 
@@ -59,7 +46,7 @@ export type BroadcastJobData = {
 };
 
 export async function getJobStatus(queue: Queue | { add?: unknown }, jobId: string) {
-  if (config.NODE_ENV === 'test' || !('client' in queue)) {
+  if (!('client' in queue)) {
     return null;
   }
 

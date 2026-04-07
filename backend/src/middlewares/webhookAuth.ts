@@ -4,10 +4,6 @@ import { config } from '../config/config.js';
 import { buildError } from '../utils/errors.js';
 
 export function verifyWebhookSignature(req: Request, res: Response, next: NextFunction) {
-  if (config.NODE_ENV === 'test') {
-    return next();
-  }
-
   const signatureHeader = req.headers['x-snap-signature'];
   if (!signatureHeader || typeof signatureHeader !== 'string') {
     return next(buildError('INVALID_SIGNATURE', 'Missing or invalid signature header', 401));
