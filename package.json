@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx backend/server.ts",
+    "dev:backend": "tsx backend/server.ts",
+    "dev:frontend": "vite --config frontend/vite.config.ts",
     "worker": "tsx backend/worker.ts",
     "start": "tsx backend/server.ts",
     "test": "vitest run",

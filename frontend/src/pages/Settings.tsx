@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Settings as SettingsIcon, Lock, Globe, CreditCard, ChevronRight,
   Mail, AlertTriangle, PhoneCall, Clock, Save, Loader2, CheckCircle2,
-  X, Copy, Check, Phone, MessageSquare, Facebook, Instagram, ExternalLink,
+  X, Copy, Check, Phone, MessageSquare, ExternalLink,
   Eye, EyeOff, KeyRound, Users, UserPlus
 } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -34,7 +34,7 @@ function IntegrationsPanel({ businessId, onClose }: { businessId: string; onClos
     {
       id: 'instagram',
       name: 'Instagram',
-      icon: Instagram,
+      icon: Globe,
       color: 'text-pink-600',
       bg: 'bg-pink-50',
       border: 'border-pink-200',
@@ -45,7 +45,7 @@ function IntegrationsPanel({ businessId, onClose }: { businessId: string; onClos
     {
       id: 'facebook',
       name: 'Facebook',
-      icon: Facebook,
+      icon: MessageSquare,
       color: 'text-blue-600',
       bg: 'bg-blue-50',
       border: 'border-blue-200',

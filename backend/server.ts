@@ -1,6 +1,7 @@
 import { createApp } from './app.js';
 import { config } from './src/config/config.js';
 import { logger } from './src/utils/logger.js';
+import { fileURLToPath } from 'url';
 
 async function startServer() {
   const app = await createApp();
@@ -13,6 +14,7 @@ async function startServer() {
   });
 }
 
-if (process.argv[1] === new URL(import.meta.url).pathname) {
+const __filename = fileURLToPath(import.meta.url);
+if (process.argv[1] === __filename) {
   startServer();
 }

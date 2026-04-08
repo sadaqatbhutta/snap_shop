@@ -9,7 +9,7 @@ dotenv.config({ path: envPath });
 
 const ConfigSchema = z.object({
   PORT: z.coerce.number().default(3000),
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  NODE_ENV: z.enum(['development', 'production', 'test', 'staging']).default('development'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 
   GEMINI_API_KEY: z.string().min(1, 'GEMINI_API_KEY is required'),

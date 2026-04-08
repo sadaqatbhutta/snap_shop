@@ -22,12 +22,13 @@ export default function Dashboard() {
   useEffect(() => {
     if (!businessId) return;
 
+    setLoading(false);
+
     // Live recent conversations
     const convUnsub = onSnapshot(
       query(collection(db, `businesses/${businessId}/conversations`), orderBy('updatedAt', 'desc'), limit(5)),
       snap => {
         setConversations(snap.docs.map(d => ({ id: d.id, ...d.data() } as Conversation)));
-        setLoading(false);
       }
     );
 
@@ -37,8 +38,8 @@ export default function Dashboard() {
       snap => setBroadcasts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Broadcast)))
     );
 
-    // Customer count
-    getDocs(collection(db, `businesses/${businessId}/customers`)).then(s => setCustomerCount(s.size));
+    // Customer count (non-blocking)
+    getDocs(collection(db, `businesses/${businessId}/customers`)).then(s => setCustomerCount(s.size)).catch(() => setCustomerCount(0));
 
     return () => { convUnsub(); bcUnsub(); };
   }, [businessId]);

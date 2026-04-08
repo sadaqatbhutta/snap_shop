@@ -43,11 +43,30 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
           createdAt: new Date().toISOString(),
           confidenceThreshold: 0.7,
         };
-        await setDoc(bizRef, newBusiness);
-        setBusiness(newBusiness);
+        try {
+          await setDoc(bizRef, newBusiness);
+          setBusiness(newBusiness);
+        } catch (writeErr) {
+          console.warn('Could not create business in Firestore:', writeErr);
+          setBusiness(newBusiness);
+        }
       }
     } catch (err) {
       console.error('BusinessContext error:', err);
+      const user = auth.currentUser;
+      if (user) {
+        const defaultBusiness: Business = {
+          id: user.uid,
+          name: user.displayName?.trim() || 'My Business',
+          description: '',
+          aiContext: 'We are a business that helps customers with their needs.',
+          faqs: [],
+          ownerEmail: user.email ?? '',
+          createdAt: new Date().toISOString(),
+          confidenceThreshold: 0.7,
+        };
+        setBusiness(defaultBusiness);
+      }
     } finally {
       setLoading(false);
     }
