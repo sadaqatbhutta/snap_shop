@@ -9,8 +9,8 @@ import { config } from '../config/config.js';
 
 export const apiRouter = Router();
 
-apiRouter.use('/webhook', webhookRouter);
+apiRouter.use('/webhook', rateLimiter({ windowMs: config.RATE_LIMIT_WINDOW_MS, maxRequests: config.RATE_LIMIT_MAX_REQ, keyPrefix: 'rl_webhook' }), webhookRouter);
 apiRouter.use('/emr', rateLimiter({ windowMs: config.RATE_LIMIT_WINDOW_MS, maxRequests: config.RATE_LIMIT_EMR_MAX_REQ, keyPrefix: 'rl_emr' }), emrRouter);
-apiRouter.use('/broadcast', broadcastRouter);
-apiRouter.use('/team', teamRouter);
+apiRouter.use('/broadcast', rateLimiter({ windowMs: config.RATE_LIMIT_WINDOW_MS, maxRequests: config.RATE_LIMIT_MAX_REQ, keyPrefix: 'rl_broadcast' }), broadcastRouter);
+apiRouter.use('/team', rateLimiter({ windowMs: config.RATE_LIMIT_WINDOW_MS, maxRequests: config.RATE_LIMIT_MAX_REQ, keyPrefix: 'rl_team' }), teamRouter);
 apiRouter.use('/', observabilityRouter);

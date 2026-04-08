@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { FieldValue } from 'firebase-admin/firestore';
-import { webhookQueue, getJobStatus, defaultJobOptions, WebhookJobData } from '../queues/queue.js';
+import { webhookQueue, getJobStatus, defaultJobOptions, WebhookJobData, connection as redis } from '../queues/queue.js';
 import { db } from '../config/firebase.js';
 import { normalizeMetaPayload } from './metaNormalizer.js';
 import { sendMessage } from './channelSender.js';
@@ -201,15 +201,16 @@ export async function processWebhookJob(channel: string, body: Record<string, un
 }
 
 async function isDuplicate(id: string) {
-  try {
-    const key = `dedup:${id}`;
-    const result = await db.doc(`meta/dedup/${key}`).get();
-    if (result.exists) return true;
-    await db.doc(`meta/dedup/${key}`).set({ createdAt: new Date().toISOString() });
-    return false;
-  } catch {
+  // Redis NX + EX: set only if not exists, 1 hour TTL
+  if (!redis) {
+    // Fallback: if Redis unavailable, skip deduplication
+    logger.warn('Redis unavailable for deduplication check');
     return false;
   }
+  
+  const key = `dedup:${id}`;
+  const result = await redis.set(key, '1', 'NX', 'EX', 3600);
+  return result === null; // null means key already existed (duplicate)
 }
 
 async function runAIPipeline(message: string, businessId: string, history: { role: 'user' | 'model'; content: string }[]) {
