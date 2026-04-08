@@ -86,31 +86,39 @@ export default function Conversations() {
     setSending(true);
 
     const now = new Date().toISOString();
-    const agentMsg: Omit<Message, 'id'> = {
-      conversationId: selectedId,
-      businessId,
-      senderId: auth.currentUser?.uid || 'unknown-agent',
-      senderType: 'agent',
-      content: input.trim(),
-      type: 'text',
-      timestamp: now,
-    };
-
     const msgText = input.trim();
     setInput('');
 
     try {
-      await addDoc(
-        collection(db, `businesses/${businessId}/conversations/${selectedId}/messages`),
-        agentMsg
-      );
+      // ─── FIX: Call backend API to send message to customer ─────────────
+      const response = await fetch('/api/conversations/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversationId: selectedId,
+          businessId,
+          content: msgText,
+          senderId: auth.currentUser?.uid || 'unknown-agent',
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to send message');
+      }
+
+      // Message is already stored in Firestore by the backend
+      // and sent to the customer via WhatsApp/Instagram/Facebook
+      
+      // Update conversation lastMessage (backend does this too, but update locally for instant UI)
       await updateDoc(doc(db, `businesses/${businessId}/conversations`, selectedId), {
         lastMessage: msgText,
         updatedAt: now,
       });
     } catch (err) {
       console.error('Failed to send message:', err);
-      setInput(msgText);
+      alert(`Failed to send message: ${(err as Error).message}`);
+      setInput(msgText); // Restore input on error
     } finally {
       setSending(false);
     }

@@ -4,6 +4,7 @@ import { emrRouter } from './emr.js';
 import { broadcastRouter } from './broadcast.js';
 import { teamRouter } from './team.js';
 import { observabilityRouter } from './observability.js';
+import { conversationsRouter } from './conversations.js';
 import { rateLimiter } from '../middlewares/rateLimiter.js';
 import { config } from '../config/config.js';
 
@@ -13,4 +14,5 @@ apiRouter.use('/webhook', rateLimiter({ windowMs: config.RATE_LIMIT_WINDOW_MS, m
 apiRouter.use('/emr', rateLimiter({ windowMs: config.RATE_LIMIT_WINDOW_MS, maxRequests: config.RATE_LIMIT_EMR_MAX_REQ, keyPrefix: 'rl_emr' }), emrRouter);
 apiRouter.use('/broadcast', rateLimiter({ windowMs: config.RATE_LIMIT_WINDOW_MS, maxRequests: config.RATE_LIMIT_MAX_REQ, keyPrefix: 'rl_broadcast' }), broadcastRouter);
 apiRouter.use('/team', rateLimiter({ windowMs: config.RATE_LIMIT_WINDOW_MS, maxRequests: config.RATE_LIMIT_MAX_REQ, keyPrefix: 'rl_team' }), teamRouter);
+apiRouter.use('/conversations', rateLimiter({ windowMs: config.RATE_LIMIT_WINDOW_MS, maxRequests: config.RATE_LIMIT_MAX_REQ, keyPrefix: 'rl_conversations' }), conversationsRouter);
 apiRouter.use('/', observabilityRouter);
