@@ -196,7 +196,12 @@ export default function Conversations() {
                       {chat.customerName || 'Unknown'}
                     </h4>
                     {isUrgent && (
-                      <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" title="Updated in last 60s" />
+                      <motion.div
+                        className="w-2 h-2 rounded-full bg-red-500"
+                        animate={{ scale: [1, 1.3, 1], opacity: [1, 0.7, 1] }}
+                        transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+                        title="Updated in last 60s"
+                      />
                     )}
                   </div>
                   <span className="text-[10px] text-gray-400 uppercase font-medium">
@@ -358,13 +363,15 @@ export default function Conversations() {
                   />
                   <div className="absolute right-3 bottom-3 flex items-center gap-2">
                     <span className="text-[10px] text-gray-400 group-focus-within:opacity-100 opacity-0 transition-opacity">Press Enter to send</span>
-                    <button
+                    <motion.button
                       type="submit"
                       disabled={sending || !input.trim()}
-                      className="p-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-transform active:scale-95 shadow-md disabled:bg-gray-300 disabled:shadow-none"
+                      className="p-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md disabled:bg-gray-300 disabled:shadow-none"
+                      whileTap={{ scale: 0.88, rotate: 10 }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 20 }}
                     >
                       {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-                    </button>
+                    </motion.button>
                   </div>
                 </div>
               </form>
