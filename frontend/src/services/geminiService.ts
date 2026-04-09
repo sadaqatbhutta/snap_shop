@@ -1,6 +1,12 @@
-import { GoogleGenAI, Type } from '@google/genai';
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+/**
+ * Frontend Gemini Service
+ * 
+ * SECURITY NOTE: This file should NOT contain the Gemini API key.
+ * All AI processing happens on the backend for security.
+ * 
+ * This service is kept for potential future client-side AI features
+ * that use a separate, restricted API key with proper CORS/domain restrictions.
+ */
 
 export interface AIResponse {
   intent: string;
@@ -10,57 +16,40 @@ export interface AIResponse {
   shouldEscalate: boolean;
 }
 
-export async function processMessage(
+/**
+ * Process message via backend API (secure)
+ * 
+ * This is the correct way to use AI - through the backend where the API key is secure.
+ */
+export async function processMessageViaBackend(
   message: string,
-  businessName: string,
-  businessContext: string,
-  faqs: string[],
-  conversationHistory: { role: 'user' | 'model'; content: string }[]
+  conversationId: string,
+  businessId: string
 ): Promise<AIResponse> {
-  const systemInstruction = `You are a business assistant for ${businessName}.
-RULES:
-- Only answer from the provided context and FAQs.
-- Be concise and professional.
-- Reply in the user's language (Urdu, English, Arabic, or Roman Urdu).
-- If you don't know the answer, or if the user asks for a human agent, set shouldEscalate to true.
-- Do not hallucinate or make up information.
-- Confidence should be between 0 and 1.
-
-CONTEXT:
-${businessContext}
-
-FAQs:
-${faqs.join('\n')}`;
-
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash',
-    contents: [
-      ...conversationHistory.map(h => ({ role: h.role, parts: [{ text: h.content }] })),
-      { role: 'user', parts: [{ text: message }] },
-    ],
-    config: {
-      systemInstruction,
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          intent: { type: Type.STRING },
-          language: { type: Type.STRING },
-          confidence: { type: Type.NUMBER },
-          reply: { type: Type.STRING },
-          shouldEscalate: { type: Type.BOOLEAN },
-        },
-        required: ['intent', 'language', 'confidence', 'reply', 'shouldEscalate'],
-      },
-    },
+  const response = await fetch('/api/ai/process', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, conversationId, businessId }),
   });
 
-  const result = JSON.parse(response.text || '{}');
-  return {
-    intent: result.intent || 'unknown',
-    language: result.language || 'unknown',
-    confidence: result.confidence ?? 0,
-    reply: result.reply || "Let me connect you with a human agent.",
-    shouldEscalate: result.shouldEscalate || (result.confidence ?? 0) < 0.7,
-  };
+  if (!response.ok) {
+    throw new Error('Failed to process message');
+  }
+
+  return response.json();
+}
+
+/**
+ * DEPRECATED: Direct AI processing from frontend
+ * 
+ * This function is kept for reference but should NOT be used.
+ * It would expose the API key in the frontend bundle.
+ * 
+ * Use processMessageViaBackend() instead.
+ */
+export function processMessage(): never {
+  throw new Error(
+    'Direct AI processing from frontend is disabled for security. ' +
+    'Use processMessageViaBackend() or let the webhook handler process messages.'
+  );
 }

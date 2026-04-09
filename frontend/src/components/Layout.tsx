@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   LayoutDashboard, MessageSquare, Users, Settings, LogOut,
   Bot, TrendingUp, Megaphone, User, ChevronDown, KeyRound
@@ -7,6 +8,7 @@ import {
 import { cn } from '../lib/utils';
 import { logout } from '../services/authService';
 import { auth } from '../firebase';
+import { scaleIn } from '../lib/animations';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -52,42 +54,71 @@ export default function Layout({ children }: LayoutProps) {
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-6">
+      <motion.aside
+        className="w-64 bg-white border-r border-gray-200 flex flex-col"
+        initial={{ x: -20, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ duration: 0.3, ease: 'easeOut' }}
+      >
+        <motion.div
+          className="p-6"
+          initial={{ opacity: 0, x: -12 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.1, duration: 0.3 }}
+        >
           <h1 className="text-2xl font-bold text-indigo-600 flex items-center gap-2">
             <Bot className="w-8 h-8" />
             SnapShop
           </h1>
-        </div>
+        </motion.div>
 
         <nav className="flex-1 px-4 space-y-1">
-          {navItems.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={cn(
-                'flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors',
-                location.pathname === item.path
-                  ? 'bg-indigo-50 text-indigo-700'
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-              )}
-            >
-              <item.icon className="w-5 h-5" />
-              {item.label}
-            </Link>
-          ))}
+          {navItems.map((item) => {
+            const isActive = location.pathname === item.path;
+            return (
+              <motion.div
+                key={item.path}
+                whileHover={{ x: 4 }}
+                whileTap={{ scale: 0.97 }}
+                transition={{ duration: 0.15 }}
+              >
+                <Link
+                  to={item.path}
+                  className={cn(
+                    'flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors relative',
+                    isActive
+                      ? 'text-indigo-700'
+                      : 'text-gray-600 hover:text-gray-900'
+                  )}
+                >
+                  {isActive && (
+                    <motion.div
+                      layoutId="active-nav-pill"
+                      className="absolute inset-0 bg-indigo-50 rounded-lg -z-10"
+                      transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+                    />
+                  )}
+                  <item.icon className="w-5 h-5" />
+                  {item.label}
+                </Link>
+              </motion.div>
+            );
+          })}
         </nav>
 
         <div className="p-4 border-t border-gray-200">
-          <button
+          <motion.button
             onClick={handleLogout}
             className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-red-600 rounded-lg hover:bg-red-50 w-full transition-colors"
+            whileHover={{ x: 4 }}
+            whileTap={{ scale: 0.97 }}
+            transition={{ duration: 0.15 }}
           >
             <LogOut className="w-5 h-5" />
             Logout
-          </button>
+          </motion.button>
         </div>
-      </aside>
+      </motion.aside>
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto">
@@ -125,8 +156,16 @@ export default function Layout({ children }: LayoutProps) {
             </button>
 
             {/* Dropdown Menu */}
-            {profileOpen && (
-              <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden z-50">
+            <AnimatePresence>
+              {profileOpen && (
+                <motion.div
+                  className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden z-50"
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  variants={scaleIn}
+                  style={{ transformOrigin: 'top right' }}
+                >
                 {/* User Info Header */}
                 <div className="p-4 bg-indigo-50 border-b border-indigo-100">
                   <div className="flex items-center gap-3">
@@ -175,8 +214,9 @@ export default function Layout({ children }: LayoutProps) {
                     Sign Out
                   </button>
                 </div>
-              </div>
-            )}
+              </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </header>
 

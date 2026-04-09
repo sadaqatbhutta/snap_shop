@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   FileText, Plus, Search, Edit2, Trash2, Copy, Layout,
   Type, Image as ImageIcon, CheckCircle2, ChevronLeft, X, Loader2
@@ -16,6 +17,7 @@ import {
   collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc
 } from 'firebase/firestore';
 import { Template } from '../../../shared/types';
+import { staggerContainer, staggerItem, fadeUp, scaleIn } from '../lib/animations';
 
 export default function Templates() {
   const { businessId } = useBusiness();
@@ -64,7 +66,12 @@ export default function Templates() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <motion.div
+        className="flex justify-between items-center"
+        variants={fadeUp}
+        initial="initial"
+        animate="animate"
+      >
         <div className="flex items-center gap-4">
           <Link to="/broadcasts" className="p-2 hover:bg-gray-100 rounded-full transition-colors">
             <ChevronLeft className="w-6 h-6 text-gray-500" />
@@ -80,7 +87,7 @@ export default function Templates() {
         >
           <Plus className="w-4 h-4" /> Create Template
         </button>
-      </div>
+      </motion.div>
 
       <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-3">
         <Search className="w-4 h-4 text-gray-400 shrink-0" />
@@ -93,9 +100,20 @@ export default function Templates() {
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <motion.div
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+        variants={staggerContainer}
+        initial="initial"
+        animate="animate"
+      >
         {filtered.map(template => (
-          <div key={template.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col group hover:border-indigo-300 transition-all">
+          <motion.div
+            key={template.id}
+            className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col group hover:border-indigo-300 transition-all"
+            variants={staggerItem}
+            whileHover={{ y: -2 }}
+            transition={{ duration: 0.2 }}
+          >
             <div className="p-5 flex-1">
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-2">
@@ -143,7 +161,7 @@ export default function Templates() {
                 <Layout className="w-3 h-3" /> Preview
               </button>
             </div>
-          </div>
+          </motion.div>
         ))}
 
         <button
@@ -158,16 +176,23 @@ export default function Templates() {
             <p className="text-xs text-gray-500">Create a reusable message</p>
           </div>
         </button>
-      </div>
+      </motion.div>
 
       {filtered.length === 0 && templates.length === 0 && (
         <div className="text-center py-8 text-gray-400 text-sm">No templates yet. Create your first one above.</div>
       )}
 
       {/* Create Template Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+      <AnimatePresence>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+              variants={scaleIn}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
             <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-indigo-600 text-white">
               <h2 className="text-xl font-bold flex items-center gap-2"><FileText className="w-5 h-5" /> Create Template</h2>
               <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white/20 rounded-full"><X className="w-5 h-5" /></button>
@@ -205,9 +230,10 @@ export default function Templates() {
                 </button>
               </div>
             </form>
-          </div>
+          </motion.div>
         </div>
       )}
+    </AnimatePresence>
     </div>
   );
 }

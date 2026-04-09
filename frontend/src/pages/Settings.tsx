@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Settings as SettingsIcon, Lock, Globe, CreditCard, ChevronRight,
   Mail, AlertTriangle, PhoneCall, Clock, Save, Loader2, CheckCircle2,
@@ -10,6 +11,7 @@ import { useBusiness } from '../context/BusinessContext';
 import { db, auth } from '../firebase';
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import { staggerContainer, staggerItem, fadeUp, scaleIn } from '../lib/animations';
 
 type Panel = null | 'integrations' | 'security' | 'billing' | 'team';
 
@@ -220,7 +222,13 @@ function SecurityPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+      <motion.div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+        variants={scaleIn}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+      >
         <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-indigo-600 text-white">
           <div className="flex items-center gap-3">
             <Lock className="w-6 h-6" />
@@ -238,14 +246,22 @@ function SecurityPanel({ onClose }: { onClose: () => void }) {
             </div>
           </div>
 
-          {message && (
-            <div className={cn('p-3 rounded-lg text-sm font-medium flex items-center gap-2',
-              message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
-            )}>
-              {message.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
-              {message.text}
-            </div>
-          )}
+          <AnimatePresence>
+            {message && (
+              <motion.div
+                className={cn('p-3 rounded-lg text-sm font-medium flex items-center gap-2',
+                  message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
+                )}
+                variants={scaleIn}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+              >
+                {message.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+                {message.text}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {[
             { label: 'Current Password', value: currentPassword, onChange: setCurrentPassword },
@@ -272,12 +288,19 @@ function SecurityPanel({ onClose }: { onClose: () => void }) {
 
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} className="flex-1 px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancel</button>
-            <button type="submit" disabled={saving} className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-60 flex items-center justify-center gap-2">
+            <motion.button
+              type="submit"
+              disabled={saving}
+              className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-60 flex items-center justify-center gap-2"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              transition={{ duration: 0.15 }}
+            >
               {saving && <Loader2 className="w-4 h-4 animate-spin" />} Update Password
-            </button>
+            </motion.button>
           </div>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 }
@@ -468,9 +491,14 @@ export default function Settings() {
   ];
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <motion.div
+      className="max-w-4xl mx-auto space-y-8"
+      variants={staggerContainer}
+      initial="initial"
+      animate="animate"
+    >
       {/* General Settings */}
-      <div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm space-y-6">
+      <motion.div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm space-y-6" variants={staggerItem}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-indigo-50 rounded-lg"><SettingsIcon className="w-6 h-6 text-indigo-600" /></div>
@@ -479,11 +507,17 @@ export default function Settings() {
               <p className="text-sm text-gray-500">Manage your business profile and preferences.</p>
             </div>
           </div>
-          <button onClick={handleSave} disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-60">
+          <motion.button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-60"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
+            transition={{ duration: 0.15 }}
+          >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
             {saved ? 'Saved!' : 'Save Changes'}
-          </button>
+          </motion.button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -506,10 +540,10 @@ export default function Settings() {
           </code>
           <p className="text-xs text-indigo-500 mt-2">Use this as <code>business_id</code> in webhook payloads.</p>
         </div>
-      </div>
+      </motion.div>
 
       {/* Email Notifications */}
-      <div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm space-y-6">
+      <motion.div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm space-y-6" variants={staggerItem}>
         <div className="flex items-center gap-3">
           <div className="p-2 bg-indigo-50 rounded-lg"><Mail className="w-6 h-6 text-indigo-600" /></div>
           <div>
@@ -531,10 +565,13 @@ export default function Settings() {
                   <p className="text-xs text-gray-500">{item.desc}</p>
                 </div>
               </div>
-              <button onClick={() => toggle(item.key)}
-                className={cn('w-12 h-6 rounded-full transition-colors relative', notifications[item.key] ? 'bg-indigo-600' : 'bg-gray-200')}>
+              <motion.button
+                onClick={() => toggle(item.key)}
+                className={cn('w-12 h-6 rounded-full transition-colors relative', notifications[item.key] ? 'bg-indigo-600' : 'bg-gray-200')}
+                whileTap={{ scale: 0.95 }}
+              >
                 <div className={cn('absolute top-1 w-4 h-4 bg-white rounded-full transition-all', notifications[item.key] ? 'left-7' : 'left-1')} />
-              </button>
+              </motion.button>
             </div>
           ))}
           <div className="pt-4 border-t border-gray-100 flex items-center gap-4">
@@ -550,10 +587,10 @@ export default function Settings() {
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Clickable Sections */}
-      <div className="space-y-4">
+      <motion.div className="space-y-4" variants={staggerItem}>
         {sections.map(section => (
           <button key={section.label} onClick={() => setActivePanel(section.panel)}
             className="w-full bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between hover:bg-gray-50 hover:border-indigo-200 transition-all group">
@@ -569,10 +606,13 @@ export default function Settings() {
             <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-indigo-600 transition-colors" />
           </button>
         ))}
-      </div>
+      </motion.div>
 
       {/* Danger Zone */}
-      <div className="bg-red-50 p-6 rounded-xl border border-red-100 flex items-center justify-between">
+      <motion.div
+        className="bg-red-50 p-6 rounded-xl border border-red-100 flex items-center justify-between"
+        variants={staggerItem}
+      >
         <div>
           <h4 className="font-semibold text-red-900">Danger Zone</h4>
           <p className="text-sm text-red-700">Permanently delete your business account and all associated data.</p>
@@ -580,21 +620,38 @@ export default function Settings() {
         <button className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors">
           Delete Account
         </button>
-      </div>
+      </motion.div>
 
       {/* Panels */}
-      {activePanel === 'integrations' && businessId && (
-        <IntegrationsPanel businessId={businessId} onClose={() => setActivePanel(null)} />
-      )}
-      {activePanel === 'security' && (
-        <SecurityPanel onClose={() => setActivePanel(null)} />
-      )}
-      {activePanel === 'billing' && (
-        <BillingPanel onClose={() => setActivePanel(null)} />
-      )}
-      {activePanel === 'team' && businessId && (
-        <TeamPanel businessId={businessId} onClose={() => setActivePanel(null)} />
-      )}
-    </div>
+      <AnimatePresence>
+        {activePanel === 'integrations' && businessId && (
+          <IntegrationsPanel businessId={businessId} onClose={() => setActivePanel(null)} />
+        )}
+        {activePanel === 'security' && (
+          <SecurityPanel onClose={() => setActivePanel(null)} />
+        )}
+        {activePanel === 'billing' && (
+          <BillingPanel onClose={() => setActivePanel(null)} />
+        )}
+        {activePanel === 'team' && businessId && (
+          <TeamPanel businessId={businessId} onClose={() => setActivePanel(null)} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {saved && (
+          <motion.div
+            className="fixed bottom-8 right-8 bg-green-600 text-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-2 z-50"
+            variants={scaleIn}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+          >
+            <CheckCircle2 className="w-5 h-5" />
+            <span className="font-semibold">Settings saved successfully!</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }

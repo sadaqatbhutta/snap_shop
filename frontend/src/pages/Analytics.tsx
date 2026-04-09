@@ -4,12 +4,14 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { motion, useMotionValue, useTransform, animate } from 'motion/react';
 import { BarChart, LineChart, Calendar, ChevronDown, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useBusiness } from '../context/BusinessContext';
 import { db } from '../firebase';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { Conversation, Message } from '../../../shared/types';
+import { staggerContainer, staggerItem, fadeUp } from '../lib/animations';
 
 interface Stats {
   convsByDay: number[];
@@ -17,6 +19,21 @@ interface Stats {
   channelCounts: Record<string, number>;
   totalMessages: number;
   escalationRate: number;
+}
+
+function AnimatedNumber({ value }: { value: number }) {
+  const motionValue = useMotionValue(0);
+  const rounded = useTransform(motionValue, (latest) => Math.round(latest));
+
+  useEffect(() => {
+    const controls = animate(motionValue, value, {
+      duration: 1.2,
+      ease: 'easeOut',
+    });
+    return controls.stop;
+  }, [motionValue, value]);
+
+  return <motion.span>{rounded}</motion.span>;
 }
 
 export default function Analytics() {
@@ -107,31 +124,56 @@ export default function Analytics() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <motion.div
+        className="flex items-center justify-between"
+        variants={fadeUp}
+        initial="initial"
+        animate="animate"
+      >
         <h3 className="text-lg font-semibold text-gray-900">Performance Overview</h3>
         <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50">
           <Calendar className="w-4 h-4" /> Last 12 Days <ChevronDown className="w-4 h-4" />
         </button>
-      </div>
+      </motion.div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <motion.div
+        className="grid grid-cols-2 md:grid-cols-4 gap-4"
+        variants={staggerContainer}
+        initial="initial"
+        animate="animate"
+      >
         {[
-          { label: 'Total Conversations', value: totalConvs },
-          { label: 'Total Messages', value: stats?.totalMessages || 0 },
-          { label: 'Escalation Rate', value: `${stats?.escalationRate || 0}%` },
-          { label: 'Channels Active', value: channels.length },
+          { label: 'Total Conversations', value: totalConvs, isNumber: true },
+          { label: 'Total Messages', value: stats?.totalMessages || 0, isNumber: true },
+          { label: 'Escalation Rate', value: stats?.escalationRate || 0, suffix: '%', isNumber: true },
+          { label: 'Channels Active', value: channels.length, isNumber: true },
         ].map(s => (
-          <div key={s.label} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+          <motion.div
+            key={s.label}
+            className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm"
+            variants={staggerItem}
+            whileHover={{ y: -2 }}
+            transition={{ duration: 0.2 }}
+          >
             <p className="text-xs text-gray-500 mb-1">{s.label}</p>
-            <p className="text-2xl font-bold text-gray-900">{s.value}</p>
-          </div>
+            <p className="text-2xl font-bold text-gray-900">
+              {s.isNumber ? <AnimatedNumber value={typeof s.value === 'number' ? s.value : 0} /> : s.value}
+              {s.suffix || ''}
+            </p>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Conversation Volume Bar Chart */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+        <motion.div
+          className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.2 }}
+          transition={{ duration: 0.4, delay: 0 }}
+        >
           <div className="flex items-center justify-between mb-6">
             <h4 className="font-semibold text-gray-800">Conversation Volume</h4>
             <BarChart className="w-5 h-5 text-gray-400" />
@@ -154,10 +196,16 @@ export default function Analytics() {
             <span>6d ago</span>
             <span>Today</span>
           </div>
-        </div>
+        </motion.div>
 
         {/* Channel Distribution */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+        <motion.div
+          className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.2 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+        >
           <h4 className="font-semibold text-gray-800 mb-6">Channel Distribution</h4>
           {channels.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-8">No data yet.</p>
@@ -176,11 +224,17 @@ export default function Analytics() {
               ))}
             </div>
           )}
-        </div>
+        </motion.div>
       </div>
 
       {/* Intent Analysis */}
-      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+      <motion.div
+        className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm"
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.2 }}
+        transition={{ duration: 0.4, delay: 0.2 }}
+      >
         <h4 className="font-semibold text-gray-800 mb-6">Intent Analysis</h4>
         {intents.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-4">No intent data yet. Intents are detected as messages come in via webhooks.</p>
@@ -202,7 +256,7 @@ export default function Analytics() {
             ))}
           </div>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 }

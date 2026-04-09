@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { Business } from '../../../shared/types';
+import { LayoutSkeleton } from '../components/Skeleton';
 
 interface BusinessContextValue {
   business: Business | null;
@@ -84,6 +85,10 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
     () => ({ business, businessId: business?.id ?? null, loading, refreshBusiness: loadBusiness }),
     [business, loading, loadBusiness],
   );
+
+  if (loading) {
+    return <LayoutSkeleton />;
+  }
 
   return (
     <BusinessContext.Provider value={value}>

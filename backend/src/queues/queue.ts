@@ -39,8 +39,16 @@ function createRedisConnection(): Redis | null {
     // Parse REDIS_URL for TLS (common in staging/production)
     if (config.REDIS_URL.startsWith('rediss://')) {
       redisOptions.tls = {
-        rejectUnauthorized: false, // For self-signed certs in staging
+        // In production, validate certificates properly
+        rejectUnauthorized: config.NODE_ENV === 'production',
+        // In staging, allow self-signed certs
+        ...(config.NODE_ENV !== 'production' && { rejectUnauthorized: false }),
       };
+      
+      logger.info({ 
+        env: config.NODE_ENV, 
+        validateCerts: config.NODE_ENV === 'production' 
+      }, 'Redis TLS enabled');
     }
 
     const redis = new Redis(config.REDIS_URL, redisOptions);

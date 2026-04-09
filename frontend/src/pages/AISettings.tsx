@@ -4,10 +4,12 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Bot, Save, Plus, X, Info, ShieldCheck, Zap, Loader2, CheckCircle2 } from 'lucide-react';
 import { useBusiness } from '../context/BusinessContext';
 import { db } from '../firebase';
 import { doc, updateDoc } from 'firebase/firestore';
+import { staggerContainer, staggerItem, fadeUp, scaleIn } from '../lib/animations';
 
 export default function AISettings() {
   const { business, businessId, refreshBusiness } = useBusiness();
@@ -48,8 +50,13 @@ export default function AISettings() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      <div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm space-y-6">
+    <motion.div
+      className="max-w-4xl mx-auto space-y-8"
+      variants={staggerContainer}
+      initial="initial"
+      animate="animate"
+    >
+      <motion.div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm space-y-6" variants={staggerItem}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-indigo-50 rounded-lg">
@@ -60,14 +67,17 @@ export default function AISettings() {
               <p className="text-sm text-gray-500">Define how your AI assistant behaves and what it knows.</p>
             </div>
           </div>
-          <button
+          <motion.button
             onClick={handleSave}
             disabled={saving}
             className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-60"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
+            transition={{ duration: 0.15 }}
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
             {saved ? 'Saved!' : 'Save Changes'}
-          </button>
+          </motion.button>
         </div>
 
         <div className="space-y-4">
@@ -84,9 +94,9 @@ export default function AISettings() {
             <p>The AI uses this context to answer customer questions. Be as detailed as possible about your offerings, location, and brand voice.</p>
           </div>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm space-y-6">
+      <motion.div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm space-y-6" variants={staggerItem}>
         <div className="flex items-center gap-3">
           <div className="p-2 bg-indigo-50 rounded-lg">
             <Plus className="w-6 h-6 text-indigo-600" />
@@ -127,9 +137,9 @@ export default function AISettings() {
             {faqs.length === 0 && <p className="text-sm text-gray-400 text-center py-4">No FAQs yet. Add some above.</p>}
           </div>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <motion.div className="grid grid-cols-1 md:grid-cols-2 gap-6" variants={staggerItem}>
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
             <ShieldCheck className="w-5 h-5 text-green-600" />
@@ -169,7 +179,22 @@ export default function AISettings() {
             ))}
           </div>
         </div>
-      </div>
-    </div>
+      </motion.div>
+
+      <AnimatePresence>
+        {saved && (
+          <motion.div
+            className="fixed bottom-8 right-8 bg-green-600 text-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-2 z-50"
+            variants={scaleIn}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+          >
+            <CheckCircle2 className="w-5 h-5" />
+            <span className="font-semibold">Settings saved successfully!</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }

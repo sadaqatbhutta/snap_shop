@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Search, Filter, Send, User, Bot, Info, AlertTriangle, Loader2, XCircle, Zap
 } from 'lucide-react';
@@ -10,6 +11,8 @@ import {
 } from 'firebase/firestore';
 import { Conversation, Message } from '../../../shared/types';
 import { auth } from '../firebase';
+import { slideInRight, fadeIn } from '../lib/animations';
+import { ConversationsSkeleton } from '../components/Skeleton';
 
 const CHANNEL_COLORS: Record<string, string> = {
   whatsapp: 'bg-green-100 text-green-800',
@@ -27,6 +30,7 @@ export default function Conversations() {
   const [sending, setSending] = useState(false);
   const [search, setSearch] = useState('');
   const [nowForUrgent, setNowForUrgent] = useState(Date.now());
+  const [loading, setLoading] = useState(true);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -50,6 +54,7 @@ export default function Conversations() {
     return onSnapshot(q, snap => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as Conversation));
       setConversations(data);
+      setLoading(false);
     });
   }, [businessId]);
 
@@ -137,6 +142,10 @@ export default function Conversations() {
     c.lastMessage?.toLowerCase().includes(search.toLowerCase())
   );
 
+  if (loading) {
+    return <ConversationsSkeleton />;
+  }
+
   return (
     <div className="flex h-[calc(100vh-160px)] bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
       {/* ─── Conversation List ─── */}
@@ -171,13 +180,15 @@ export default function Conversations() {
                             (nowForUrgent - new Date(chat.updatedAt).getTime()) < 60000;
             
             return (
-              <div
+              <motion.div
                 key={chat.id}
                 onClick={() => setSelectedId(chat.id)}
                 className={cn(
                   'p-4 cursor-pointer transition-all border-l-4 relative',
                   selectedId === chat.id ? 'bg-indigo-50 border-indigo-600' : 'border-transparent hover:bg-gray-50'
                 )}
+                whileHover={{ x: 2 }}
+                whileTap={{ scale: 0.99 }}
               >
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2 overflow-hidden">
@@ -205,15 +216,23 @@ export default function Conversations() {
                     {chat.status === 'human_escalated' ? 'Urgent' : chat.status}
                   </div>
                 </div>
-              </div>
+              </motion.div>
             );
           })}
         </div>
       </div>
 
       {/* ─── Chat Interface ─── */}
-      {selected ? (
-        <div className="flex-1 flex flex-col bg-white">
+      <AnimatePresence mode="wait">
+        {selected ? (
+          <motion.div
+            key={selectedId}
+            className="flex-1 flex flex-col bg-white"
+            variants={slideInRight}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+          >
           {/* Header */}
           <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-white z-10">
             <div className="flex items-center gap-4">
@@ -261,12 +280,15 @@ export default function Conversations() {
             {messages.map((msg, idx) => {
               const isFirstInGroup = idx === 0 || messages[idx-1].senderType !== msg.senderType;
               return (
-                <div
+                <motion.div
                   key={msg.id}
                   className={cn(
                     'flex items-start gap-3 w-full',
                     msg.senderType === 'customer' ? 'flex-row' : 'flex-row-reverse'
                   )}
+                  initial={{ opacity: 0, y: 8, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ duration: 0.2 }}
                 >
                   <div className={cn(
                     'w-8 h-8 rounded-full flex items-center justify-center text-white shrink-0 shadow-sm mt-1',
@@ -294,7 +316,7 @@ export default function Conversations() {
                       {msg.senderType === 'ai' && msg.intent && ` · ${msg.intent}`}
                     </span>
                   </div>
-                </div>
+                </motion.div>
               );
             })}
             <div ref={bottomRef} className="h-4" />
@@ -348,16 +370,23 @@ export default function Conversations() {
               </form>
             )}
           </div>
-        </div>
-      ) : (
-        <div className="flex-1 flex flex-col items-center justify-center text-gray-300 bg-gray-50/20">
-          <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-            <Bot className="w-8 h-8" />
-          </div>
-          <p className="text-sm font-medium">Select a conversation from the sidebar</p>
-          <p className="text-xs mt-1">Real-time updates are enabled</p>
-        </div>
-      )}
+          </motion.div>
+        ) : (
+          <motion.div
+            className="flex-1 flex flex-col items-center justify-center text-gray-300 bg-gray-50/20"
+            variants={fadeIn}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+          >
+            <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+              <Bot className="w-8 h-8" />
+            </div>
+            <p className="text-sm font-medium">Select a conversation from the sidebar</p>
+            <p className="text-xs mt-1">Real-time updates are enabled</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

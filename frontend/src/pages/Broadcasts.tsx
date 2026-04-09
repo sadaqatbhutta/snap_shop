@@ -1,9 +1,5 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Megaphone, Plus, Search, Filter, Calendar, Clock, CheckCircle2,
   AlertCircle, MoreVertical, Users, FileText, TrendingUp, X, Loader2,
@@ -15,6 +11,8 @@ import { useBusiness } from '../context/BusinessContext';
 import { db } from '../firebase';
 import { collection, query, orderBy, onSnapshot, addDoc } from 'firebase/firestore';
 import { Broadcast, Template, Segment } from '../../../shared/types';
+import { staggerContainer, staggerItem, fadeUp, scaleIn } from '../lib/animations';
+import { TableSkeleton } from '../components/Skeleton';
 
 export default function Broadcasts() {
   const { businessId } = useBusiness();
@@ -24,14 +22,16 @@ export default function Broadcasts() {
   const [activeTab, setActiveTab] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ name: '', templateId: '', segmentId: '', scheduledAt: '' });
 
   useEffect(() => {
     if (!businessId) return;
     const unsubs = [
-      onSnapshot(query(collection(db, `businesses/${businessId}/broadcasts`), orderBy('createdAt', 'desc')), snap =>
-        setBroadcasts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Broadcast)))
-      ),
+      onSnapshot(query(collection(db, `businesses/${businessId}/broadcasts`), orderBy('createdAt', 'desc')), snap => {
+        setBroadcasts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Broadcast)));
+        setLoading(false);
+      }),
       onSnapshot(collection(db, `businesses/${businessId}/templates`), snap =>
         setTemplates(snap.docs.map(d => ({ id: d.id, ...d.data() } as Template)))
       ),
@@ -85,9 +85,18 @@ export default function Broadcasts() {
 
   const filtered = broadcasts.filter(b => activeTab === 'all' || b.status === activeTab);
 
+  if (loading) {
+    return <TableSkeleton rows={6} />;
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <motion.div
+        className="flex justify-between items-center"
+        variants={fadeUp}
+        initial="initial"
+        animate="animate"
+      >
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Broadcasts</h1>
           <p className="text-gray-500 text-sm">Send bulk messages to your customer segments.</p>
@@ -103,7 +112,7 @@ export default function Broadcasts() {
             <Plus className="w-4 h-4" /> New Broadcast
           </button>
         </div>
-      </div>
+      </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
@@ -162,9 +171,20 @@ export default function Broadcasts() {
                 <th className="px-6 py-5" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <motion.tbody
+              className="divide-y divide-gray-50"
+              variants={staggerContainer}
+              initial="initial"
+              animate="animate"
+            >
               {filtered.map(bc => (
-                <tr key={bc.id} className="group hover:bg-indigo-50/20 transition-all">
+                <motion.tr
+                  key={bc.id}
+                  className="group hover:bg-indigo-50/20 transition-all"
+                  variants={staggerItem}
+                  whileHover={{ backgroundColor: 'rgba(99,102,241,0.04)' }}
+                  whileTap={{ scale: 0.995 }}
+                >
                   <td className="px-6 py-5">
                     <div className="flex flex-col">
                       <span className="text-sm font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">{bc.name}</span>
@@ -232,17 +252,24 @@ export default function Broadcasts() {
                       </button>
                     </div>
                   </td>
-                </tr>
+                </motion.tr>
               ))}
-            </tbody>
+            </motion.tbody>
           </table>
         )}
       </div>
 
       {/* Create Broadcast Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+      <AnimatePresence>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+              variants={scaleIn}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
             <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-indigo-600 text-white">
               <h2 className="text-xl font-bold flex items-center gap-2"><Megaphone className="w-5 h-5" /> New Broadcast</h2>
               <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white/20 rounded-full"><X className="w-5 h-5" /></button>
@@ -283,9 +310,10 @@ export default function Broadcasts() {
                 </button>
               </div>
             </form>
-          </div>
+          </motion.div>
         </div>
       )}
+    </AnimatePresence>
     </div>
   );
 }

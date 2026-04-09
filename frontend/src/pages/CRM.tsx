@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Search, Filter, Download, Plus, MoreHorizontal, Mail, Phone, Tag,
   ChevronUp, ChevronDown, ArrowUpDown, Edit2, Check, X, MessageSquare,
@@ -10,6 +11,8 @@ import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { Customer } from '../../../shared/types';
+import { staggerContainer, staggerItem, fadeUp, scaleIn } from '../lib/animations';
+import { TableSkeleton } from '../components/Skeleton';
 
 type SortKey = keyof Customer | null;
 type FilterChannel = 'all' | 'whatsapp' | 'instagram' | 'facebook' | 'webchat';
@@ -111,11 +114,16 @@ export default function CRM() {
     return sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1 text-indigo-600" /> : <ChevronDown className="w-3 h-3 ml-1 text-indigo-600" />;
   };
 
-  if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>;
+  if (loading) return <TableSkeleton rows={8} />;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <motion.div
+        className="flex items-center justify-between"
+        variants={fadeUp}
+        initial="initial"
+        animate="animate"
+      >
         <div className="flex items-center gap-3 flex-1 max-w-lg">
           <div className="relative flex-1">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -154,7 +162,7 @@ export default function CRM() {
             <Download className="w-4 h-4" /> Export CSV
           </button>
         </div>
-      </div>
+      </motion.div>
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         {sorted.length === 0 ? (
@@ -180,9 +188,21 @@ export default function CRM() {
                 <th className="px-6 py-4" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <motion.tbody
+              className="divide-y divide-gray-100"
+              variants={staggerContainer}
+              initial="initial"
+              animate="animate"
+            >
               {sorted.map(customer => (
-                <tr key={customer.id} className="hover:bg-gray-50 transition-colors group cursor-pointer" onClick={() => { setSelectedCustomer(customer); setNotesInput(customer.notes || ''); setEditingNotes(false); }}>
+                <motion.tr
+                  key={customer.id}
+                  className="hover:bg-gray-50 transition-colors group cursor-pointer"
+                  onClick={() => { setSelectedCustomer(customer); setNotesInput(customer.notes || ''); setEditingNotes(false); }}
+                  variants={staggerItem}
+                  whileHover={{ backgroundColor: 'rgba(99,102,241,0.04)' }}
+                  whileTap={{ scale: 0.995 }}
+                >
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-xs">
@@ -258,17 +278,25 @@ export default function CRM() {
                       )}
                     </div>
                   </td>
-                </tr>
+                </motion.tr>
               ))}
-            </tbody>
+            </motion.tbody>
           </table>
         )}
       </div>
 
       {/* Customer Detail Modal */}
-      {selectedCustomer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedCustomer(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+      <AnimatePresence>
+        {selectedCustomer && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedCustomer(null)}>
+            <motion.div
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
+              onClick={e => e.stopPropagation()}
+              variants={scaleIn}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
             <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 rounded-2xl bg-indigo-600 flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-indigo-200">
@@ -373,9 +401,10 @@ export default function CRM() {
                 Close
               </button>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
+    </AnimatePresence>
     </div>
   );
 }

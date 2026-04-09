@@ -13,6 +13,7 @@ import {
   deleteDoc, doc, getDocs, where
 } from 'firebase/firestore';
 import { Segment } from '../../../shared/types';
+import { staggerContainer, staggerItem, fadeUp, scaleIn } from '../lib/animations';
 
 const defaultForm = {
   name: '', description: '', channel: 'all', tags: '',
@@ -125,7 +126,12 @@ export default function Segments() {
 
   return (
     <div className="space-y-6 text-gray-900">
-      <div className="flex justify-between items-center">
+      <motion.div
+        className="flex justify-between items-center"
+        variants={fadeUp}
+        initial="initial"
+        animate="animate"
+      >
         <div className="flex items-center gap-4">
           <Link to="/broadcasts" className="p-2 hover:bg-gray-100 rounded-full transition-colors">
             <ChevronLeft className="w-6 h-6 text-gray-500" />
@@ -138,7 +144,7 @@ export default function Segments() {
         <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">
           <Plus className="w-4 h-4" /> Create Segment
         </button>
-      </div>
+      </motion.div>
 
       <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-3">
         <Search className="w-4 h-4 text-gray-400 shrink-0" />
@@ -169,9 +175,20 @@ export default function Segments() {
                 <th className="px-6 py-4" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <motion.tbody
+              className="divide-y divide-gray-200"
+              variants={staggerContainer}
+              initial="initial"
+              animate="animate"
+            >
               {filtered.map(segment => (
-                <tr key={segment.id} className="hover:bg-gray-50 transition-colors group">
+                <motion.tr
+                  key={segment.id}
+                  className="hover:bg-gray-50 transition-colors group"
+                  variants={staggerItem}
+                  whileHover={{ backgroundColor: 'rgba(99,102,241,0.04)' }}
+                  whileTap={{ scale: 0.995 }}
+                >
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-indigo-50 rounded-lg">
@@ -216,9 +233,9 @@ export default function Segments() {
                       </button>
                     </div>
                   </td>
-                </tr>
+                </motion.tr>
               ))}
-            </tbody>
+            </motion.tbody>
           </table>
         )}
       </div>
@@ -251,6 +268,7 @@ export default function Segments() {
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              transition={{ duration: 0.2 }}
               className="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden"
             >
               <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-indigo-600 text-white">

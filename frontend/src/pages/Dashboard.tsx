@@ -1,16 +1,14 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { motion } from 'motion/react';
 import { MessageSquare, Users, TrendingUp, Clock, ArrowUpRight, Megaphone, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useBusiness } from '../context/BusinessContext';
 import { db } from '../firebase';
 import { collection, query, orderBy, limit, onSnapshot, getDocs } from 'firebase/firestore';
 import { Conversation, Broadcast } from '../../../shared/types';
+import { staggerContainer, staggerItem, fadeUp } from '../lib/animations';
+import { DashboardSkeleton } from '../components/Skeleton';
 
 export default function Dashboard() {
   const { businessId } = useBusiness();
@@ -54,18 +52,25 @@ export default function Dashboard() {
   ];
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   return (
     <div className="space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <motion.div
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+        variants={staggerContainer}
+        initial="initial"
+        animate="animate"
+      >
         {stats.map(stat => (
-          <div key={stat.label} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+          <motion.div
+            key={stat.label}
+            className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
+            variants={staggerItem}
+            whileHover={{ y: -2 }}
+            transition={{ duration: 0.2 }}
+          >
             <div className="flex items-center justify-between mb-4">
               <div className={cn('p-2 rounded-lg', stat.bg)}>
                 <stat.icon className={cn('w-6 h-6', stat.color)} />
@@ -74,28 +79,38 @@ export default function Dashboard() {
             </div>
             <h3 className="text-sm font-medium text-gray-500">{stat.label}</h3>
             <p className="text-2xl font-bold text-gray-900 mt-1">{stat.value}</p>
-          </div>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
           {/* Recent Conversations */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+            <motion.div
+              className="p-6 border-b border-gray-200 flex items-center justify-between"
+              variants={fadeUp}
+              initial="initial"
+              animate="animate"
+            >
               <h3 className="font-semibold text-gray-800">Recent Conversations</h3>
               <Link to="/conversations" className="text-sm text-indigo-600 font-medium hover:underline">View all</Link>
-            </div>
-            <div className="divide-y divide-gray-100">
+            </motion.div>
+            <motion.div
+              className="divide-y divide-gray-100"
+              variants={staggerContainer}
+              initial="initial"
+              animate="animate"
+            >
               {conversations.length === 0 && (
                 <p className="p-6 text-sm text-gray-400 text-center">No conversations yet. Messages from your channels will appear here.</p>
               )}
               {conversations.map(conv => (
-                <Link
-                  key={conv.id}
-                  to="/conversations"
-                  className="p-4 hover:bg-gray-50 transition-colors flex items-center justify-between cursor-pointer"
-                >
+                <motion.div key={conv.id} variants={staggerItem}>
+                  <Link
+                    to="/conversations"
+                    className="p-4 hover:bg-gray-50 transition-colors flex items-center justify-between cursor-pointer block"
+                  >
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center font-bold text-indigo-700">
                       {conv.customerName?.charAt(0) || '?'}
@@ -118,23 +133,38 @@ export default function Dashboard() {
                       {conv.status === 'human_escalated' ? 'Human' : conv.status}
                     </span>
                   </div>
-                </Link>
+                  </Link>
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           </div>
 
           {/* Recent Broadcasts */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+            <motion.div
+              className="p-6 border-b border-gray-200 flex items-center justify-between"
+              variants={fadeUp}
+              initial="initial"
+              animate="animate"
+            >
               <h3 className="font-semibold text-gray-800">Recent Broadcasts</h3>
               <Link to="/broadcasts" className="text-sm text-indigo-600 font-medium hover:underline">View all</Link>
-            </div>
-            <div className="p-6 space-y-4">
+            </motion.div>
+            <motion.div
+              className="p-6 space-y-4"
+              variants={staggerContainer}
+              initial="initial"
+              animate="animate"
+            >
               {broadcasts.length === 0 && (
                 <p className="text-sm text-gray-400 text-center">No broadcasts yet.</p>
               )}
               {broadcasts.map(bc => (
-                <div key={bc.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <motion.div
+                  key={bc.id}
+                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                  variants={staggerItem}
+                >
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-indigo-100 rounded-lg">
                       <Megaphone className="w-4 h-4 text-indigo-600" />
@@ -152,9 +182,9 @@ export default function Dashboard() {
                   )}>
                     {bc.status}
                   </span>
-                </div>
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           </div>
         </div>
 
