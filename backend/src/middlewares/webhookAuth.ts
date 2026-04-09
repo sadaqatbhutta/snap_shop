@@ -86,3 +86,55 @@ export function verifyAnyWebhookSignature(req: Request, res: Response, next: Nex
     return next(buildError('INVALID_SIGNATURE', 'Missing webhook signature', 401));
   }
 }
+
+/**
+ * Verify TikTok webhook signatures.
+ * Accepts:
+ * - X-TikTok-Signature: <hex_or_base64>
+ * - optional X-TikTok-Timestamp
+ */
+export function verifyTiktokSignature(req: Request, res: Response, next: NextFunction) {
+  const signatureHeader =
+    (req.headers['x-tiktok-signature'] as string | undefined) ||
+    (req.headers['x-tiktok-signature-256'] as string | undefined);
+
+  if (!signatureHeader) {
+    return next(buildError('INVALID_SIGNATURE', 'Missing TikTok signature header', 401));
+  }
+
+  const rawBody = (req as any).rawBody as Buffer | undefined;
+  if (!rawBody) {
+    return next(buildError('INVALID_SIGNATURE', 'No payload to verify', 401));
+  }
+
+  const tiktokSecret = config.TIKTOK_WEBHOOK_SECRET || config.WEBHOOK_SECRET;
+  const timestamp = (req.headers['x-tiktok-timestamp'] as string | undefined) || '';
+  const bodyString = rawBody.toString('utf8');
+
+  const bodyOnlyHex = crypto.createHmac('sha256', tiktokSecret).update(rawBody).digest('hex');
+  const bodyOnlyBase64 = crypto.createHmac('sha256', tiktokSecret).update(rawBody).digest('base64');
+  const tsBodyHex = crypto.createHmac('sha256', tiktokSecret).update(`${timestamp}.${bodyString}`).digest('hex');
+  const tsBodyBase64 = crypto.createHmac('sha256', tiktokSecret).update(`${timestamp}.${bodyString}`).digest('base64');
+
+  const normalized = signatureHeader.trim();
+  const valid = [bodyOnlyHex, bodyOnlyBase64, tsBodyHex, tsBodyBase64].some(sig => {
+    const expected = Buffer.from(sig, 'utf8');
+    const actual = Buffer.from(normalized, 'utf8');
+    return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+  });
+
+  if (!valid) {
+    logger.warn({ signatureHeader }, 'TikTok signature mismatch');
+    return next(buildError('INVALID_SIGNATURE', 'TikTok signature verification failed', 401));
+  }
+
+  next();
+}
+
+export function verifyChannelWebhookSignature(req: Request, res: Response, next: NextFunction) {
+  const { channel } = req.params;
+  if (channel === 'tiktok') {
+    return verifyTiktokSignature(req, res, next);
+  }
+  return verifyAnyWebhookSignature(req, res, next);
+}

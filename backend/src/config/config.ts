@@ -38,6 +38,7 @@ const ConfigSchema = z.object({
 
   SMTP_API_URL: z.string().optional(),
   APP_URL: z.string().url().default('http://localhost:5173'),
+  TIKTOK_WEBHOOK_SECRET: z.string().optional(),
 });
 
 const parsed = ConfigSchema.safeParse(process.env);

@@ -18,6 +18,23 @@ const BusinessContext = createContext<BusinessContextValue>({
   refreshBusiness: async () => {},
 });
 
+const FIRESTORE_BOOTSTRAP_TIMEOUT_MS = 8000;
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutHandle = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutHandle) clearTimeout(timeoutHandle);
+  }
+}
+
 export function BusinessProvider({ children }: { children: React.ReactNode }) {
   const [business, setBusiness] = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
@@ -29,7 +46,7 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const bizRef = doc(db, 'businesses', user.uid);
-      const bizSnap = await getDoc(bizRef);
+      const bizSnap = await withTimeout(getDoc(bizRef), FIRESTORE_BOOTSTRAP_TIMEOUT_MS, 'Business fetch');
 
       if (bizSnap.exists()) {
         setBusiness({ ...(bizSnap.data() as Omit<Business, 'id'>), id: bizSnap.id });
@@ -45,7 +62,7 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
           confidenceThreshold: 0.7,
         };
         try {
-          await setDoc(bizRef, newBusiness);
+          await withTimeout(setDoc(bizRef, newBusiness), FIRESTORE_BOOTSTRAP_TIMEOUT_MS, 'Business create');
           setBusiness(newBusiness);
         } catch (writeErr) {
           console.warn('Could not create business in Firestore:', writeErr);

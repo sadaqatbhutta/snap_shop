@@ -45,3 +45,5 @@ export function requireRole(roles: string[]) {
     next();
   };
 }
+
+export { verifyBusinessAccess, requireAdmin } from './businessAccess.js';

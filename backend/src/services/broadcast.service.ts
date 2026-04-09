@@ -1,8 +1,9 @@
 import { db } from '../config/firebase.js';
-import { broadcastQueue, defaultJobOptions, BroadcastJobData } from '../queues/queue.js';
+import { broadcastQueue, defaultJobOptions, BroadcastJobData, connection } from '../queues/queue.js';
 import { buildError } from '../utils/errors.js';
 import { sendMessage } from './channelSender.js';
 import { logger } from '../utils/logger.js';
+import { Job } from 'bullmq';
 
 export async function scheduleBroadcast(broadcastId: string, businessId: string, scheduledAt?: string, requestId?: string) {
   const broadcastRef = db.doc(`businesses/${businessId}/broadcasts/${broadcastId}`);
@@ -32,6 +33,7 @@ export async function scheduleBroadcast(broadcastId: string, businessId: string,
 
   await broadcastRef.update({
     status: delay > 0 ? 'scheduled' : 'sending',
+    queuedJobId: String(job.id),
     updatedAt: new Date().toISOString(),
   });
 
@@ -41,6 +43,35 @@ export async function scheduleBroadcast(broadcastId: string, businessId: string,
     scheduled: delay > 0,
     delay_ms: delay,
   };
+}
+
+export async function cancelBroadcast(broadcastId: string, businessId: string) {
+  const broadcastRef = db.doc(`businesses/${businessId}/broadcasts/${broadcastId}`);
+  const broadcastSnap = await broadcastRef.get();
+  if (!broadcastSnap.exists) {
+    throw buildError('BROADCAST_NOT_FOUND', 'Broadcast not found', 404);
+  }
+
+  const broadcast = broadcastSnap.data() as { queuedJobId?: string; status?: string } | undefined;
+  const queuedJobId = broadcast?.queuedJobId;
+
+  if (queuedJobId && connection) {
+    const job = await Job.fromId(broadcastQueue as any, queuedJobId);
+    if (job) {
+      const state = await job.getState();
+      if (state === 'waiting' || state === 'delayed') {
+        await job.remove();
+      }
+    }
+  }
+
+  await broadcastRef.update({
+    status: 'cancelled',
+    cancelledAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+
+  return { status: 'cancelled', broadcastId };
 }
 
 export async function processBroadcastJob(data: BroadcastJobData) {

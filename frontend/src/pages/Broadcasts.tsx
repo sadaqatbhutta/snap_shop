@@ -9,10 +9,11 @@ import { cn } from '../lib/utils';
 import { Link } from 'react-router-dom';
 import { useBusiness } from '../context/BusinessContext';
 import { db } from '../firebase';
-import { collection, query, orderBy, onSnapshot, addDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc } from 'firebase/firestore';
 import { Broadcast, Template, Segment } from '../../../shared/types';
 import { staggerContainer, staggerItem, fadeUp, scaleIn } from '../lib/animations';
 import { TableSkeleton } from '../components/Skeleton';
+import { auth } from '../firebase';
 
 export default function Broadcasts() {
   const { businessId } = useBusiness();
@@ -49,7 +50,7 @@ export default function Broadcasts() {
     const tmpl = templates.find(t => t.id === form.templateId);
     const seg = segments.find(s => s.id === form.segmentId);
     const now = new Date().toISOString();
-    await addDoc(collection(db, `businesses/${businessId}/broadcasts`), {
+    const docRef = await addDoc(collection(db, `businesses/${businessId}/broadcasts`), {
       businessId,
       name: form.name,
       templateId: form.templateId,
@@ -61,6 +62,23 @@ export default function Broadcasts() {
       reach: seg?.count || 0,
       createdAt: now,
     });
+
+    if (form.scheduledAt) {
+      try {
+        const idToken = await auth.currentUser?.getIdToken();
+        const resp = await fetch(`/api/broadcast/${docRef.id}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+          body: JSON.stringify({ businessId, scheduledAt: new Date(form.scheduledAt).toISOString() }),
+        });
+        if (!resp.ok) {
+          throw new Error('Failed to queue scheduled broadcast');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Broadcast was saved, but scheduling failed. You can retry with "Send Now".');
+      }
+    }
     setSaving(false);
     setIsModalOpen(false);
     setForm({ name: '', templateId: '', segmentId: '', scheduledAt: '' });
@@ -69,9 +87,10 @@ export default function Broadcasts() {
   const handleSendNow = async (broadcastId: string) => {
     if (!businessId || !confirm('Are you sure you want to send this broadcast now?')) return;
     try {
+      const idToken = await auth.currentUser?.getIdToken();
       const resp = await fetch(`/api/broadcast/${broadcastId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ businessId }),
       });
       if (!resp.ok) throw new Error('Failed to trigger broadcast');
@@ -80,6 +99,25 @@ export default function Broadcasts() {
     } catch (err) {
       console.error(err);
       alert('Error triggering broadcast');
+    }
+  };
+
+  const handleDelete = async (broadcastId: string) => {
+    if (!businessId || !confirm('Delete this broadcast? Scheduled jobs will be cancelled.')) return;
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const resp = await fetch(`/api/broadcast/${broadcastId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ businessId }),
+      });
+      if (!resp.ok) {
+        throw new Error('Failed to cancel broadcast job');
+      }
+      await deleteDoc(doc(db, `businesses/${businessId}/broadcasts`, broadcastId));
+    } catch (err) {
+      console.error(err);
+      alert('Failed to delete broadcast');
     }
   };
 
@@ -241,11 +279,7 @@ export default function Broadcasts() {
                       )}
                       
                       <button
-                        onClick={async () => {
-                          if (!confirm('Delete this broadcast archive?')) return;
-                          const { doc, deleteDoc } = await import('firebase/firestore');
-                          await deleteDoc(doc(db, `businesses/${businessId}/broadcasts`, bc.id));
-                        }}
+                        onClick={() => handleDelete(bc.id)}
                         className="p-2.5 hover:bg-red-50 rounded-xl text-gray-400 hover:text-red-600 transition-colors"
                       >
                         <Trash className="w-5 h-5" />

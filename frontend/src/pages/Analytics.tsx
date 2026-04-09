@@ -40,6 +40,7 @@ export default function Analytics() {
   const { businessId } = useBusiness();
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [rangeDays, setRangeDays] = useState(12);
 
   useEffect(() => {
     if (!businessId) return;
@@ -47,7 +48,7 @@ export default function Analytics() {
     async function load() {
       // 1. Fetch pre-aggregated daily stats (Last 30 days)
       const statsSnap = await getDocs(
-        query(collection(db, `businesses/${businessId}/stats`), orderBy('__name__', 'desc'), limit(30))
+        query(collection(db, `businesses/${businessId}/stats`), orderBy('__name__', 'desc'), limit(Math.max(rangeDays, 30)))
       );
       
       // 2. Fetch recent conversations (Last 200 - for channel/escalation breakdown)
@@ -59,7 +60,7 @@ export default function Analytics() {
       const convs = convSnap.docs.map(d => d.data() as Conversation);
 
       // Aggregates from stats
-      const convsByDay = Array(12).fill(0);
+      const convsByDay = Array(rangeDays).fill(0);
       const now = new Date();
       let aggregatedTotalMessages = 0;
       const aggregatedIntents: Record<string, number> = {};
@@ -67,8 +68,8 @@ export default function Analytics() {
       statsDocs.forEach(s => {
         const date = new Date(s.date);
         const diffDays = Math.floor((now.getTime() - date.getTime()) / 86400000);
-        if (diffDays < 12) {
-          convsByDay[11 - diffDays] = (s as any).totalConversations || 0;
+        if (diffDays < rangeDays) {
+          convsByDay[rangeDays - 1 - diffDays] = (s as any).totalConversations || 0;
         }
         aggregatedTotalMessages += (s as any).totalMessages || 0;
         
@@ -96,7 +97,7 @@ export default function Analytics() {
     }
 
     load();
-  }, [businessId]);
+  }, [businessId, rangeDays]);
 
   if (loading) {
     return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>;
@@ -131,9 +132,19 @@ export default function Analytics() {
         animate="animate"
       >
         <h3 className="text-lg font-semibold text-gray-900">Performance Overview</h3>
-        <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50">
-          <Calendar className="w-4 h-4" /> Last 12 Days <ChevronDown className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600">
+          <Calendar className="w-4 h-4" />
+          <select
+            value={rangeDays}
+            onChange={(e) => setRangeDays(Number(e.target.value))}
+            className="bg-transparent outline-none"
+          >
+            <option value={7}>Last 7 Days</option>
+            <option value={12}>Last 12 Days</option>
+            <option value={30}>Last 30 Days</option>
+          </select>
+          <ChevronDown className="w-4 h-4" />
+        </div>
       </motion.div>
 
       {/* Summary Cards */}
@@ -192,8 +203,8 @@ export default function Analytics() {
             ))}
           </div>
           <div className="flex justify-between mt-3 text-[10px] text-gray-400 font-medium">
-            <span>12d ago</span>
-            <span>6d ago</span>
+            <span>{rangeDays}d ago</span>
+            <span>{Math.ceil(rangeDays / 2)}d ago</span>
             <span>Today</span>
           </div>
         </motion.div>

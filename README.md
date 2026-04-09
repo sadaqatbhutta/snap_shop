@@ -1,93 +1,139 @@
 # SnapShop AI
 
-A multi-tenant AI-powered customer communication and sales automation platform. This repo contains a production-ready backend built with Express, BullMQ, Firebase Admin, and Google Gemini.
+Multi-tenant AI-powered customer communication platform with a React frontend and an Express/BullMQ backend.  
+It supports agent chat, AI replies (Gemini), broadcasts, templates, segments, team invites, analytics, and website webchat embed.
 
 ---
 
-## 🏗️ Backend Structure
+## Stack
+
+- Frontend: React, Vite, Firebase Web SDK
+- Backend: Express, BullMQ, Firebase Admin, Zod, Pino
+- AI: Google Gemini
+- Queueing: Redis (with in-memory dev fallback)
+
+---
+
+## Project Structure
 
 ```text
+frontend/                   # React dashboard and settings UI
 backend/
-├── app.ts                 # Express app factory
-├── server.ts              # HTTP server bootstrap
-├── worker.ts              # Background job worker bootstrap
-├── src/
-│   ├── config/
-│   │   ├── config.ts      # Environment validation
-│   │   └── firebase.ts    # Firebase Admin initialization
-│   ├── controllers/       # Request handlers
-│   ├── middlewares/       # Auth, validation, error handling, logging
-│   ├── queues/            # BullMQ queue definitions and worker factory
-│   ├── routes/            # API route registration
-│   ├── services/          # Business logic and Firestore access
-│   ├── utils/             # Logger, retry helpers, Swagger, metrics, log store
-│   └── validations/       # Zod schemas for all major endpoints
+├── app.ts                  # Express app factory
+├── server.ts               # API server bootstrap
+├── worker.ts               # Queue worker bootstrap
+└── src/
+    ├── config/             # Env validation + Firebase Admin init
+    ├── controllers/        # Route handlers
+    ├── middlewares/        # Auth, signatures, validation, errors
+    ├── queues/             # Queue + worker factory
+    ├── routes/             # API route modules
+    ├── services/           # Business logic (AI, webhook, broadcast, team)
+    ├── validations/        # Zod schemas
+    └── utils/              # Logger, metrics, retry, swagger
+shared/                     # Shared TypeScript types
 ```
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
+
 - Node.js 18+
-- Redis
-- Firebase Project with Firestore and Auth enabled
+- Firebase project (Auth + Firestore)
 - Google Gemini API key
+- Redis (recommended for production)
 
 ### Install
+
 ```bash
 npm install
 ```
 
-### Environment
-Copy `.env.example` to `.env.local` and fill in required values.
+### Configure Environment
 
-### Run locally
+Copy `.env.example` to `.env.local` and fill required values.
+
+Important values:
+
+- `GEMINI_API_KEY`
+- `FIREBASE_PROJECT_ID`
+- `WEBHOOK_SECRET`
+- `WEBHOOK_VERIFY_TOKEN`
+- `META_ACCESS_TOKEN`
+- `WHATSAPP_PHONE_NUMBER_ID`
+- `TIKTOK_ACCESS_TOKEN` (if using TikTok outbound)
+- `TIKTOK_WEBHOOK_SECRET` (if using TikTok inbound signature verification)
+
+### Run API + frontend
+
 ```bash
 npm run dev
 ```
 
-### Start workers
+### Run workers
+
 ```bash
 npm run worker
 ```
 
 ### Run tests
+
 ```bash
 npm test
 ```
 
-### Docker
-```bash
-docker build -t snapshop-backend .
-docker-compose up --build
+---
+
+## API Highlights
+
+- `POST /api/webhook/:channel`  
+  Inbound provider webhook endpoint (supports `whatsapp`, `instagram`, `facebook`, `tiktok`) with channel-aware signature verification.
+
+- `POST /api/webchat/message`  
+  Public website chat ingestion endpoint used by the embeddable webchat widget.
+
+- `POST /api/ai/process`  
+  Authenticated AI processing endpoint for frontend calls (`verifyFirebaseToken` + business access check).
+
+- `POST /api/conversations/send`  
+  Authenticated agent-to-customer send route.
+
+- `POST /api/broadcast/:broadcastId`  
+  Queue/schedule broadcast delivery.
+
+- `DELETE /api/broadcast/:broadcastId`  
+  Cancel queued scheduled broadcast and mark as cancelled.
+
+- `POST /api/team/invite`, `POST /api/team/accept`, `DELETE /api/team/invite/:token`  
+  Team invite lifecycle with revocation support.
+
+- `GET /api/health`, `GET /api/metrics`, `GET /api/logs`, `GET /api/docs`
+
+---
+
+## Webchat Widget Embed
+
+Use the script below on any website:
+
+```html
+<script
+  src="https://YOUR_FRONTEND_DOMAIN/webchat-widget.js"
+  data-business-id="YOUR_BUSINESS_ID"
+  data-api-base="https://YOUR_BACKEND_DOMAIN"
+  data-title="Chat with us"
+  data-position="right"
+  defer
+></script>
 ```
 
----
-
-## 🔧 API Highlights
-
-- `POST /api/webhook/:channel` — queue webhook payloads with HMAC verification and schema validation.
-- `POST /api/emr/post` — enqueue EMR requests with authenticated access.
-- `POST /api/broadcast/:broadcastId` — schedule or queue broadcast jobs.
-- `POST /api/team/invite` — invite teammates with secure token issuance.
-- `POST /api/team/accept` — accept team invites.
-- `GET /api/logs` — query recent structured request logs.
-- `GET /api/metrics` — in-process metrics for request volume and latency.
-- `GET /api/health` — health check with Redis queue depth.
-- `GET /api/docs` — interactive Swagger documentation.
+The widget posts messages to `/api/webchat/message`, which flows into the same AI/conversation pipeline.
 
 ---
 
-## 🔐 Production Improvements
+## Notes
 
-- Centralized environment validation using Zod.
-- Firebase JWT authentication middleware.
-- Role-aware authorization scaffolding.
-- Structured logging with Pino.
-- Central error middleware and consistent API error payloads.
-- Redis-backed rate limiting for global and EMR routes.
-- BullMQ retries with exponential backoff and failure logging.
-- Input sanitization through Zod `.trim()` schemas.
-- API documentation via Swagger UI.
-- Docker deployment ready with Redis compose support.
+- In development without Redis, the in-memory queue fallback is enabled.
+- For production, configure Redis and run the worker process.
+- Settings > Integrations shows health indicators for key channel configuration values.

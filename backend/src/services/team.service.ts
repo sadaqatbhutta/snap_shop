@@ -40,15 +40,22 @@ export async function inviteAgentToTeam(payload: InvitePayload, requestId: strin
   await inviteRef.set(inviteData);
   const inviteUrl = `${config.APP_URL}/join?token=${token}`;
 
+  let emailSent = false;
   if (config.SMTP_API_URL) {
     await axios.post(config.SMTP_API_URL, {
       to: payload.email,
       subject: `Invitation to join ${business?.name || 'your team'} on SnapShop`,
       content: `Use this link to accept the invite: ${inviteUrl}`,
     });
+    emailSent = true;
   }
 
-  return { inviteUrl, token };
+  return {
+    inviteUrl,
+    token,
+    emailSent,
+    warning: emailSent ? undefined : 'SMTP is not configured. Share inviteUrl manually.',
+  };
 }
 
 export async function acceptInviteToken(token: string, user: any) {
@@ -85,4 +92,37 @@ export async function acceptInviteToken(token: string, user: any) {
   });
 
   return { status: 'success', businessId };
+}
+
+export async function revokeInviteToken(token: string, user: any) {
+  if (!user?.email) {
+    throw buildError('UNAUTHORIZED', 'Authenticated user email is required', 401);
+  }
+
+  const inviteQuery = await db.collectionGroup('invites').where('__name__', '==', token).limit(1).get();
+  if (inviteQuery.empty) {
+    throw buildError('INVALID_TOKEN', 'Invalid invitation token', 404);
+  }
+
+  const inviteDoc = inviteQuery.docs[0];
+  const businessId = inviteDoc.ref.parent.parent?.id;
+  if (!businessId) {
+    throw buildError('INVALID_STATE', 'Could not resolve invitation business', 500);
+  }
+
+  // Verify user is business owner
+  const businessSnap = await db.doc(`businesses/${businessId}`).get();
+  if (!businessSnap.exists) {
+    throw buildError('BUSINESS_NOT_FOUND', 'Business does not exist', 404);
+  }
+
+  const business = businessSnap.data();
+  if (business?.ownerEmail !== user.email) {
+    throw buildError('FORBIDDEN', 'Only the business owner may revoke invitations', 403);
+  }
+
+  // Delete the invite
+  await inviteDoc.ref.delete();
+
+  return { status: 'revoked', token };
 }

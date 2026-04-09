@@ -5,6 +5,7 @@ import { sendMessage } from '../services/channelSender.js';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
 import { buildError } from '../utils/errors.js';
+import { verifyFirebaseToken, verifyBusinessAccess } from '../middlewares/auth.js';
 
 export const conversationsRouter = Router();
 
@@ -29,7 +30,7 @@ const SendMessageSchema = z.object({
  *   "senderId": "agent-firebase-uid"
  * }
  */
-conversationsRouter.post('/send', async (req, res, next) => {
+conversationsRouter.post('/send', verifyFirebaseToken, verifyBusinessAccess, async (req, res, next) => {
   try {
     const { conversationId, businessId, content, senderId } = SendMessageSchema.parse(req.body);
 
@@ -107,7 +108,7 @@ conversationsRouter.post('/send', async (req, res, next) => {
  *
  * Fetch all messages for a conversation (optional, for API clients).
  */
-conversationsRouter.get('/:conversationId/messages', async (req, res, next) => {
+conversationsRouter.get('/:conversationId/messages', verifyFirebaseToken, verifyBusinessAccess, async (req, res, next) => {
   try {
     const { conversationId } = req.params;
     const { businessId } = req.query;

@@ -15,6 +15,9 @@ export default function Dashboard() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
   const [customerCount, setCustomerCount] = useState(0);
+  const [totalConversations, setTotalConversations] = useState(0);
+  const [totalActiveChats, setTotalActiveChats] = useState(0);
+  const [totalBroadcastsSent, setTotalBroadcastsSent] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,10 +26,19 @@ export default function Dashboard() {
     setLoading(false);
 
     // Live recent conversations
-    const convUnsub = onSnapshot(
+    const recentConvUnsub = onSnapshot(
       query(collection(db, `businesses/${businessId}/conversations`), orderBy('updatedAt', 'desc'), limit(5)),
       snap => {
         setConversations(snap.docs.map(d => ({ id: d.id, ...d.data() } as Conversation)));
+      }
+    );
+
+    const convStatsUnsub = onSnapshot(
+      collection(db, `businesses/${businessId}/conversations`),
+      snap => {
+        const allConversations = snap.docs.map(d => d.data() as Conversation);
+        setTotalConversations(snap.size);
+        setTotalActiveChats(allConversations.filter(c => c.status === 'active').length);
       }
     );
 
@@ -36,19 +48,27 @@ export default function Dashboard() {
       snap => setBroadcasts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Broadcast)))
     );
 
+    const bcStatsUnsub = onSnapshot(
+      collection(db, `businesses/${businessId}/broadcasts`),
+      snap => {
+        const allBroadcasts = snap.docs.map(d => d.data() as Broadcast);
+        setTotalBroadcastsSent(allBroadcasts.filter(b => b.status === 'sent').length);
+      }
+    );
+
     // Customer count (non-blocking)
     getDocs(collection(db, `businesses/${businessId}/customers`)).then(s => setCustomerCount(s.size)).catch(() => setCustomerCount(0));
 
-    return () => { convUnsub(); bcUnsub(); };
+    return () => { recentConvUnsub(); convStatsUnsub(); bcUnsub(); bcStatsUnsub(); };
   }, [businessId]);
 
-  const activeCount = conversations.filter(c => c.status === 'active').length;
+  const activeCount = totalActiveChats;
 
   const stats = [
-    { label: 'Total Conversations', value: conversations.length.toString(), icon: MessageSquare, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { label: 'Total Conversations', value: totalConversations.toString(), icon: MessageSquare, color: 'text-indigo-600', bg: 'bg-indigo-50' },
     { label: 'Active Customers', value: customerCount.toString(), icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
     { label: 'Active Chats', value: activeCount.toString(), icon: Clock, color: 'text-green-600', bg: 'bg-green-50' },
-    { label: 'Broadcasts Sent', value: broadcasts.filter(b => b.status === 'sent').length.toString(), icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50' },
+    { label: 'Broadcasts Sent', value: totalBroadcastsSent.toString(), icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50' },
   ];
 
   if (loading) {

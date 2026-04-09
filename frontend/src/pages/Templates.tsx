@@ -14,7 +14,7 @@ import { cn } from '../lib/utils';
 import { useBusiness } from '../context/BusinessContext';
 import { db } from '../firebase';
 import {
-  collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc
+  collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, updateDoc
 } from 'firebase/firestore';
 import { Template } from '../../../shared/types';
 import { staggerContainer, staggerItem, fadeUp, scaleIn } from '../lib/animations';
@@ -26,6 +26,7 @@ export default function Templates() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: '', content: '', type: 'text' as 'text' | 'image' });
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!businessId) return;
@@ -40,17 +41,27 @@ export default function Templates() {
     if (!businessId) return;
     setSaving(true);
     const now = new Date().toISOString();
-    await addDoc(collection(db, `businesses/${businessId}/templates`), {
-      businessId,
-      name: form.name,
-      content: form.content,
-      type: form.type,
-      usageCount: 0,
-      createdAt: now,
-      updatedAt: now,
-    });
+    if (editingTemplateId) {
+      await updateDoc(doc(db, `businesses/${businessId}/templates`, editingTemplateId), {
+        name: form.name,
+        content: form.content,
+        type: form.type,
+        updatedAt: now,
+      });
+    } else {
+      await addDoc(collection(db, `businesses/${businessId}/templates`), {
+        businessId,
+        name: form.name,
+        content: form.content,
+        type: form.type,
+        usageCount: 0,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
     setSaving(false);
     setIsModalOpen(false);
+    setEditingTemplateId(null);
     setForm({ name: '', content: '', type: 'text' });
   };
 
@@ -82,7 +93,7 @@ export default function Templates() {
           </div>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => { setEditingTemplateId(null); setForm({ name: '', content: '', type: 'text' }); setIsModalOpen(true); }}
           className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
         >
           <Plus className="w-4 h-4" /> Create Template
@@ -124,7 +135,7 @@ export default function Templates() {
                 </div>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
-                    onClick={() => { setForm({ name: template.name, content: template.content, type: template.type }); setIsModalOpen(true); }}
+                    onClick={() => { setEditingTemplateId(template.id); setForm({ name: template.name, content: template.content, type: template.type }); setIsModalOpen(true); }}
                     className="p-1.5 hover:bg-gray-100 rounded text-gray-400 hover:text-indigo-600 transition-colors"
                   >
                     <Edit2 className="w-4 h-4" />
@@ -194,7 +205,7 @@ export default function Templates() {
               exit="exit"
             >
             <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-indigo-600 text-white">
-              <h2 className="text-xl font-bold flex items-center gap-2"><FileText className="w-5 h-5" /> Create Template</h2>
+              <h2 className="text-xl font-bold flex items-center gap-2"><FileText className="w-5 h-5" /> {editingTemplateId ? 'Edit Template' : 'Create Template'}</h2>
               <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white/20 rounded-full"><X className="w-5 h-5" /></button>
             </div>
             <form onSubmit={handleCreate} className="p-6 space-y-4">
@@ -224,9 +235,9 @@ export default function Templates() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm resize-none" />
               </div>
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancel</button>
+                <button type="button" onClick={() => { setIsModalOpen(false); setEditingTemplateId(null); }} className="flex-1 px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancel</button>
                 <button type="submit" disabled={saving} className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-60 flex items-center justify-center gap-2">
-                  {saving && <Loader2 className="w-4 h-4 animate-spin" />} Save Template
+                  {saving && <Loader2 className="w-4 h-4 animate-spin" />} {editingTemplateId ? 'Update Template' : 'Save Template'}
                 </button>
               </div>
             </form>

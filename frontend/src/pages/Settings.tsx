@@ -3,20 +3,21 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Settings as SettingsIcon, Lock, Globe, CreditCard, ChevronRight,
   Mail, AlertTriangle, PhoneCall, Clock, Save, Loader2, CheckCircle2,
-  X, Copy, Check, Phone, MessageSquare, ExternalLink,
+  X, Copy, Check, Phone, MessageSquare, ExternalLink, Music2,
   Eye, EyeOff, KeyRound, Users, UserPlus
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useBusiness } from '../context/BusinessContext';
 import { db, auth } from '../firebase';
-import { collection, onSnapshot, query, orderBy, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, doc, updateDoc } from 'firebase/firestore';
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { staggerContainer, staggerItem, fadeUp, scaleIn } from '../lib/animations';
+import WebchatWidget from '../components/WebchatWidget';
 
 type Panel = null | 'integrations' | 'security' | 'billing' | 'team';
 
 // ─── Integrations Panel ───────────────────────────────────────────────────────
-function IntegrationsPanel({ businessId, onClose }: { businessId: string; onClose: () => void }) {
+function IntegrationsPanel({ businessId, business, onClose }: { businessId: string; business: any; onClose: () => void }) {
   const [copied, setCopied] = useState<string | null>(null);
 
   const baseUrl = window.location.origin;
@@ -56,6 +57,17 @@ function IntegrationsPanel({ businessId, onClose }: { businessId: string; onClos
       docs: 'https://developers.facebook.com/docs/messenger-platform',
     },
     {
+      id: 'tiktok',
+      name: 'TikTok',
+      icon: Music2,
+      color: 'text-gray-900',
+      bg: 'bg-gray-100',
+      border: 'border-gray-300',
+      description: 'Connect TikTok messaging webhooks',
+      webhook: `${baseUrl}/api/webhook/tiktok`,
+      docs: 'https://developers.tiktok.com/',
+    },
+    {
       id: 'webchat',
       name: 'Web Chat',
       icon: MessageSquare,
@@ -63,9 +75,17 @@ function IntegrationsPanel({ businessId, onClose }: { businessId: string; onClos
       bg: 'bg-indigo-50',
       border: 'border-indigo-200',
       description: 'Embed a chat widget on your website',
-      webhook: `${baseUrl}/api/webhook/webchat`,
-      docs: '#',
+      webhook: `${baseUrl}/api/webchat/message`,
+      docs: `${baseUrl}/webchat-widget.js`,
     },
+  ];
+
+  const embedSnippet = `<script src="${baseUrl}/webchat-widget.js" data-business-id="${businessId}" data-api-base="${baseUrl}" data-title="Chat with us" data-position="right" defer></script>`;
+  const integrationHealth = [
+    { key: 'metaAccessToken', label: 'Meta Access Token', ok: Boolean(business?.metaAccessToken) },
+    { key: 'whatsappPhoneNumberId', label: 'WhatsApp Number ID', ok: Boolean(business?.whatsappPhoneNumberId) },
+    { key: 'tiktokAccessToken', label: 'TikTok Access Token', ok: Boolean(business?.tiktokAccessToken) },
+    { key: 'webchat', label: 'Webchat Widget Script', ok: Boolean(baseUrl) },
   ];
 
   const copy = (text: string, key: string) => {
@@ -169,6 +189,36 @@ function IntegrationsPanel({ businessId, onClose }: { businessId: string; onClos
               </div>
             ))}
           </div>
+
+          <div className="p-4 rounded-xl border border-gray-200 bg-white">
+            <p className="text-sm font-bold text-gray-700 mb-3">Integration Health</p>
+            <div className="space-y-2">
+              {integrationHealth.map(item => (
+                <div key={item.key} className="flex items-center justify-between text-xs">
+                  <span className="text-gray-600">{item.label}</span>
+                  <span className={cn('px-2 py-0.5 rounded-full font-bold', item.ok ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700')}>
+                    {item.ok ? 'Configured' : 'Missing'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="p-4 bg-gray-900 rounded-xl">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Website Embed Snippet</p>
+              <button
+                onClick={() => copy(embedSnippet, 'webchat-embed')}
+                className="flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors"
+              >
+                {copied === 'webchat-embed' ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
+                {copied === 'webchat-embed' ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+            <pre className="text-xs text-green-400 leading-relaxed overflow-x-auto">{embedSnippet}</pre>
+          </div>
+
+          <WebchatWidget businessId={businessId} apiBase={baseUrl} />
         </div>
 
         <div className="p-5 border-t border-gray-100 bg-gray-50/50 flex justify-end">
@@ -336,7 +386,12 @@ function BillingPanel({ onClose }: { onClose: () => void }) {
                 </div>
                 <div className="text-right">
                   <p className="font-bold text-indigo-600 text-sm">{p.price}</p>
-                  <button className="text-xs text-indigo-600 hover:underline">Upgrade</button>
+                  <button
+                    onClick={() => window.open(`mailto:sales@snapshop.ai?subject=${encodeURIComponent(`Upgrade to ${p.plan} plan`)}`, '_blank')}
+                    className="text-xs text-indigo-600 hover:underline"
+                  >
+                    Upgrade
+                  </button>
                 </div>
               </div>
             ))}
@@ -380,8 +435,13 @@ function TeamPanel({ businessId, onClose }: { businessId: string; onClose: () =>
         body: JSON.stringify({ businessId, email: inviteEmail, role }),
       });
       if (!resp.ok) throw new Error();
+      const data = await resp.json();
       setInviteEmail('');
-      alert('Invitation sent!');
+      if (data.emailSent === false) {
+        alert(`Invite created, but email delivery is not configured.\nShare this link manually:\n${data.inviteUrl}`);
+      } else {
+        alert('Invitation sent!');
+      }
     } catch {
       alert('Failed to send invite');
     } finally {
@@ -438,7 +498,19 @@ function TeamPanel({ businessId, onClose }: { businessId: string; onClose: () =>
                 {invites.filter(i => !i.used).map(invite => (
                   <div key={invite.id} className="flex items-center justify-between p-4 border border-dashed border-gray-200 rounded-2xl">
                     <div className="flex items-center gap-3"><Mail className="w-5 h-5 text-gray-400" /><div><p className="text-sm font-bold text-gray-600">{invite.email}</p><p className="text-[10px] text-gray-400">Expires {new Date(invite.expiresAt).toLocaleDateString()}</p></div></div>
-                    <button onClick={async () => { if (!confirm('Revoke?')) return; await deleteDoc(doc(db, `businesses/${businessId}/invites`, invite.id)); }} className="text-[10px] font-black text-red-500 hover:text-red-600 px-4 py-2 hover:bg-red-50 rounded-xl transition-colors uppercase tracking-widest">Revoke</button>
+                    <button onClick={async () => {
+                      if (!confirm('Revoke?')) return;
+                      try {
+                        const idToken = await auth.currentUser?.getIdToken();
+                        const resp = await fetch(`/api/team/invite/${invite.id}`, {
+                          method: 'DELETE',
+                          headers: { Authorization: `Bearer ${idToken}` },
+                        });
+                        if (!resp.ok) throw new Error();
+                      } catch {
+                        alert('Failed to revoke invite');
+                      }
+                    }} className="text-[10px] font-black text-red-500 hover:text-red-600 px-4 py-2 hover:bg-red-50 rounded-xl transition-colors uppercase tracking-widest">Revoke</button>
                   </div>
                 ))}
               </div>
@@ -467,13 +539,20 @@ export default function Settings() {
     if (business) {
       setBusinessName(business.name || '');
       setBusinessEmail(business.ownerEmail || '');
+      if ((business as any).notifications) {
+        setNotifications((business as any).notifications);
+      }
     }
   }, [business]);
 
   const handleSave = async () => {
     if (!businessId) return;
     setSaving(true);
-    await updateDoc(doc(db, 'businesses', businessId), { name: businessName });
+    await updateDoc(doc(db, 'businesses', businessId), {
+      name: businessName,
+      ownerEmail: businessEmail,
+      notifications,
+    });
     await refreshBusiness();
     setSaving(false);
     setSaved(true);
@@ -528,8 +607,8 @@ export default function Settings() {
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Business Email</label>
-            <input type="email" value={businessEmail} disabled
-              className="w-full px-4 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-500 cursor-not-allowed" />
+            <input type="email" value={businessEmail} onChange={e => setBusinessEmail(e.target.value)}
+              className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
           </div>
         </div>
 
@@ -625,7 +704,7 @@ export default function Settings() {
       {/* Panels */}
       <AnimatePresence>
         {activePanel === 'integrations' && businessId && (
-          <IntegrationsPanel businessId={businessId} onClose={() => setActivePanel(null)} />
+          <IntegrationsPanel businessId={businessId} business={business as any} onClose={() => setActivePanel(null)} />
         )}
         {activePanel === 'security' && (
           <SecurityPanel onClose={() => setActivePanel(null)} />

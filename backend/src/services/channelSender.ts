@@ -11,6 +11,34 @@ export async function sendMessage(channel: string, recipientId: string, message:
   const phoneNumberId = biz.whatsappPhoneNumberId || config.WHATSAPP_PHONE_NUMBER_ID;
   const apiUrl = 'https://graph.facebook.com/v19.0';
 
+  if (channel === 'tiktok') {
+    const tiktokAccessToken = biz.tiktokAccessToken || process.env.TIKTOK_ACCESS_TOKEN;
+    const tiktokApiBase = biz.tiktokApiBase || process.env.TIKTOK_API_BASE || 'https://open.tiktokapis.com/v2';
+    const tiktokSendPath = biz.tiktokSendPath || process.env.TIKTOK_SEND_PATH || '/message/send/';
+    if (!tiktokAccessToken) {
+      throw new Error('Missing TikTok access token');
+    }
+
+    await withRetry(async () => {
+      await axios.post(
+        `${tiktokApiBase}${tiktokSendPath}`,
+        {
+          recipient: { user_id: recipientId },
+          content: { text: message, type: 'text' },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${tiktokAccessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+    }, 'sendTiktokMessage', { maxAttempts: 3, baseDelayMs: 1000 });
+
+    logger.info({ channel, recipientId, businessId }, 'Delivered outbound message');
+    return;
+  }
+
   if (!accessToken) {
     throw new Error('Missing Meta access token');
   }

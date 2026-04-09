@@ -7,7 +7,7 @@ import { cn } from '../lib/utils';
 import { useBusiness } from '../context/BusinessContext';
 import { db } from '../firebase';
 import {
-  collection, query, orderBy, onSnapshot, addDoc, updateDoc, doc, limit
+  collection, query, orderBy, onSnapshot, updateDoc, doc, limit
 } from 'firebase/firestore';
 import { Conversation, Message } from '../../../shared/types';
 import { auth } from '../firebase';
@@ -18,6 +18,7 @@ const CHANNEL_COLORS: Record<string, string> = {
   whatsapp: 'bg-green-100 text-green-800',
   instagram: 'bg-pink-100 text-pink-800',
   facebook: 'bg-blue-100 text-blue-800',
+  tiktok: 'bg-gray-100 text-gray-800',
   webchat: 'bg-gray-100 text-gray-800',
 };
 
@@ -29,6 +30,8 @@ export default function Conversations() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'human_escalated' | 'closed'>('all');
+  const [showInfo, setShowInfo] = useState(false);
   const [nowForUrgent, setNowForUrgent] = useState(Date.now());
   const [loading, setLoading] = useState(true);
   
@@ -95,10 +98,14 @@ export default function Conversations() {
     setInput('');
 
     try {
+      const idToken = await auth.currentUser?.getIdToken();
       // ─── FIX: Call backend API to send message to customer ─────────────
       const response = await fetch('/api/conversations/send', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
         body: JSON.stringify({
           conversationId: selectedId,
           businessId,
@@ -138,8 +145,11 @@ export default function Conversations() {
   };
 
   const filtered = conversations.filter(c =>
-    c.customerName?.toLowerCase().includes(search.toLowerCase()) ||
-    c.lastMessage?.toLowerCase().includes(search.toLowerCase())
+    (statusFilter === 'all' || c.status === statusFilter) &&
+    (
+      c.customerName?.toLowerCase().includes(search.toLowerCase()) ||
+      c.lastMessage?.toLowerCase().includes(search.toLowerCase())
+    )
   );
 
   if (loading) {
@@ -162,11 +172,19 @@ export default function Conversations() {
             />
           </div>
           <div className="flex items-center justify-between">
-            <button className="flex items-center gap-2 text-xs font-medium text-gray-600 hover:text-indigo-600 transition-colors">
+            <button
+              onClick={() => {
+                const order: Array<'all' | 'active' | 'human_escalated' | 'closed'> = ['all', 'active', 'human_escalated', 'closed'];
+                const idx = order.indexOf(statusFilter);
+                setStatusFilter(order[(idx + 1) % order.length]);
+              }}
+              className="flex items-center gap-2 text-xs font-medium text-gray-600 hover:text-indigo-600 transition-colors"
+              title="Cycle filter: all, active, urgent, closed"
+            >
               <Filter className="w-3 h-3" /> Filter
             </button>
             <span className="text-xs text-gray-400">
-              {conversations.filter(c => c.status !== 'closed').length} active
+              {statusFilter === 'all' ? `${conversations.filter(c => c.status !== 'closed').length} active` : `Filter: ${statusFilter.replace('_', ' ')}`}
             </span>
           </div>
         </div>
@@ -271,7 +289,7 @@ export default function Conversations() {
                 </button>
               )}
               <div className="mx-2 w-px h-6 bg-gray-200" />
-              <button className="p-2 text-gray-400 hover:text-indigo-600 rounded-full hover:bg-gray-50" title="Information"><Info className="w-5 h-5" /></button>
+              <button onClick={() => setShowInfo(prev => !prev)} className="p-2 text-gray-400 hover:text-indigo-600 rounded-full hover:bg-gray-50" title="Information"><Info className="w-5 h-5" /></button>
             </div>
           </div>
 
@@ -377,6 +395,13 @@ export default function Conversations() {
               </form>
             )}
           </div>
+          {showInfo && (
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 text-xs text-gray-600 space-y-1">
+              <div><span className="font-semibold text-gray-800">Customer:</span> {selected.customerName || 'Unknown'}</div>
+              <div><span className="font-semibold text-gray-800">Channel:</span> {selected.channel}</div>
+              <div><span className="font-semibold text-gray-800">Conversation ID:</span> {selected.id}</div>
+            </div>
+          )}
           </motion.div>
         ) : (
           <motion.div

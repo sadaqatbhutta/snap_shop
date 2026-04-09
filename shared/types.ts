@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type Channel = 'whatsapp' | 'instagram' | 'facebook' | 'webchat';
+export type Channel = 'whatsapp' | 'instagram' | 'facebook' | 'webchat' | 'tiktok';
 
 export interface Business {
   id: string;
@@ -112,7 +112,7 @@ export interface Broadcast {
   templateName: string;
   segmentId: string;
   segmentName: string;
-  status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed';
+  status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed' | 'cancelled';
   scheduledAt?: string;
   sentAt?: string;
   reach: number;

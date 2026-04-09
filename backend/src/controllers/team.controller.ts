@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { inviteAgentToTeam, acceptInviteToken } from '../services/team.service.js';
+import { inviteAgentToTeam, acceptInviteToken, revokeInviteToken } from '../services/team.service.js';
 
 export async function inviteTeamMember(req: Request, res: Response, next: NextFunction) {
   try {
@@ -13,6 +13,16 @@ export async function inviteTeamMember(req: Request, res: Response, next: NextFu
 export async function acceptTeamInvite(req: Request, res: Response, next: NextFunction) {
   try {
     const result = await acceptInviteToken(req.body.token, (req as any).user);
+    return res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function revokeTeamInvite(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { token } = req.params;
+    const result = await revokeInviteToken(token, (req as any).user);
     return res.status(200).json(result);
   } catch (err) {
     next(err);

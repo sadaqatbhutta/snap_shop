@@ -54,6 +54,36 @@ export function normalizeMetaPayload(channel: string, body: any): WebhookPayload
     };
   }
 
+  if (channel === 'tiktok') {
+    // Supports a few common TikTok webhook shapes.
+    const msg = body?.message || body?.event?.message || body?.data?.message || {};
+    const sender = body?.sender || body?.event?.sender || body?.data?.sender || {};
+    const business = body?.business || body?.event?.business || body?.data?.business || {};
+    const messageText =
+      msg?.text ||
+      msg?.content?.text ||
+      msg?.content ||
+      body?.text ||
+      body?.message ||
+      '';
+
+    const userId = sender?.id || sender?.user_id || body?.user_id;
+    const businessId = business?.id || business?.business_id || body?.business_id;
+    const messageId = msg?.id || msg?.message_id || body?.message_id;
+    const name = sender?.name || sender?.display_name || body?.name;
+
+    if (!userId || !businessId || !messageText) return null;
+
+    return {
+      business_id: String(businessId),
+      user_id: String(userId),
+      message: String(messageText),
+      type: 'text',
+      name: name ? String(name) : undefined,
+      message_id: messageId ? String(messageId) : undefined,
+    };
+  }
+
   if (body.business_id && body.user_id && body.message) {
     return body as WebhookPayload;
   }

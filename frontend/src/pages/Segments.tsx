@@ -66,9 +66,6 @@ export default function Segments() {
     if (formData.channel !== 'all') {
       custQuery = query(collection(db, `businesses/${businessId}/customers`), where('channel', '==', formData.channel));
     }
-    const custSnap = await getDocs(custQuery);
-    const count = custSnap.size;
-
     const criteria: Segment['criteria'] = {};
     if (formData.channel !== 'all') criteria.channel = formData.channel;
     if (formData.tags) {
@@ -77,6 +74,37 @@ export default function Segments() {
     }
     if (formData.excludedTags) criteria.excludedTags = formData.excludedTags.split(',').map(t => t.trim()).filter(Boolean);
     if (formData.lastInteraction !== 'any') criteria.lastInteraction = formData.lastInteraction;
+
+    const custSnap = await getDocs(custQuery);
+    const customers = custSnap.docs.map(d => d.data() as any);
+    const cutoffDate = criteria.lastInteraction
+      ? (() => {
+          const parsedDays = parseInt(criteria.lastInteraction, 10);
+          if (Number.isNaN(parsedDays)) return null;
+          const date = new Date();
+          date.setDate(date.getDate() - parsedDays);
+          return date;
+        })()
+      : null;
+
+    const count = customers.filter(customer => {
+      if (criteria.tagLogic === 'AND' && criteria.tags?.length) {
+        const hasAllTags = criteria.tags.every(tag => customer.tags?.includes(tag));
+        if (!hasAllTags) return false;
+      }
+      if (criteria.tagLogic !== 'AND' && criteria.tags?.length) {
+        const hasAnyTag = criteria.tags.some(tag => customer.tags?.includes(tag));
+        if (!hasAnyTag) return false;
+      }
+      if (criteria.excludedTags?.length) {
+        const hasExcluded = criteria.excludedTags.some(tag => customer.tags?.includes(tag));
+        if (hasExcluded) return false;
+      }
+      if (cutoffDate && customer.lastInteractionAt) {
+        if (new Date(customer.lastInteractionAt) < cutoffDate) return false;
+      }
+      return true;
+    }).length;
 
     const now = new Date().toISOString();
 
@@ -310,6 +338,7 @@ export default function Segments() {
                           <option value="whatsapp">WhatsApp</option>
                           <option value="instagram">Instagram</option>
                           <option value="facebook">Facebook</option>
+                          <option value="tiktok">TikTok</option>
                           <option value="webchat">Web Chat</option>
                         </select>
                       </div>

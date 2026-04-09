@@ -26,9 +26,14 @@ export async function processMessageViaBackend(
   conversationId: string,
   businessId: string
 ): Promise<AIResponse> {
+  const { auth } = await import('../firebase');
+  const idToken = await auth.currentUser?.getIdToken();
   const response = await fetch('/api/ai/process', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${idToken}`,
+    },
     body: JSON.stringify({ message, conversationId, businessId }),
   });
 

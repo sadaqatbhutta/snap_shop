@@ -103,31 +103,80 @@ export const defaultJobOptions: JobsOptions = {
 };
 
 // ─── In-Memory Fallback Queue (Development) ───────────────────────────────────
+type InMemoryJobState = 'waiting' | 'delayed' | 'active' | 'completed' | 'failed';
+type InMemoryJobRecord<T> = {
+  id: string;
+  name: string;
+  data: T;
+  status: InMemoryJobState;
+  result: unknown;
+  failedReason: string | null;
+  attemptsMade: number;
+  timestamp: number;
+};
+
 class InMemoryQueue<T> {
-  private jobs: Map<string, { id: string; data: T; status: string }> = new Map();
+  private jobs: Map<string, InMemoryJobRecord<T>> = new Map();
+  private processor: ((job: Job<T>) => Promise<unknown>) | null = null;
 
-  constructor(public name: string) {}
-
-  async add(_name: string, data: T, _opts?: JobsOptions) {
-    const id = `dev-${this.name}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-    const job = { id, data, status: 'completed' };
-    this.jobs.set(id, job);
-    
+  constructor(public name: string) {
     logger.warn(
-      { queue: this.name, job_id: id, service: 'snapshop-backend' },
-      'Using in-memory fallback queue because Redis is unavailable'
+      { queue: name, service: 'snapshop-backend' },
+      '⚠️  IN-MEMORY QUEUE ACTIVE - jobs run in-process for development only.'
     );
-    
-    // Simulate async processing
+  }
+
+  setProcessor(processor: (job: Job<T>) => Promise<unknown>) {
+    this.processor = processor;
+  }
+
+  private async processJob(job: InMemoryJobRecord<T>) {
+    if (!this.processor) {
+      logger.warn({ queue: this.name, job_id: job.id }, 'In-memory queue has no processor yet');
+      return;
+    }
+    job.status = 'active';
+    job.attemptsMade += 1;
+    try {
+      const fakeJob = { id: job.id, data: job.data } as Job<T>;
+      job.result = await this.processor(fakeJob);
+      job.status = 'completed';
+      logger.info({ queue: this.name, job_id: job.id }, 'In-memory job completed');
+    } catch (err) {
+      job.status = 'failed';
+      job.failedReason = (err as Error).message;
+      logger.error({ queue: this.name, job_id: job.id, error: job.failedReason }, 'In-memory job failed');
+    }
+  }
+
+  async add(jobName: string, data: T, opts?: JobsOptions) {
+    const id = `dev-${this.name}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const delay = opts?.delay ?? 0;
+    const job: InMemoryJobRecord<T> = {
+      id,
+      name: jobName,
+      data,
+      status: delay > 0 ? 'delayed' : 'waiting',
+      result: null,
+      failedReason: null,
+      attemptsMade: 0,
+      timestamp: Date.now(),
+    };
+    this.jobs.set(id, job);
+
     setTimeout(() => {
-      logger.info({ queue: this.name, job_id: id }, 'In-memory job completed');
-    }, 100);
-    
+      void this.processJob(job);
+    }, delay);
+
     return job;
   }
 
   async getWaitingCount() {
-    return 0;
+    let waiting = 0;
+    this.jobs.forEach(job => {
+      if (job.status === 'waiting' || job.status === 'delayed') waiting += 1;
+    });
+    return waiting;
   }
 
   async getJob(id: string) {
@@ -138,9 +187,9 @@ class InMemoryQueue<T> {
 // ─── Queue Factory ────────────────────────────────────────────────────────────
 function createQueue<T>(name: string) {
   if (!connection) {
-    logger.warn(
+    logger.error(
       { queue: name, service: 'snapshop-backend' },
-      'Using in-memory fallback queue because Redis is unavailable'
+      '🚨 CRITICAL: Using in-memory fallback queue. Jobs will NOT be processed! Configure REDIS_URL to enable job processing.'
     );
     return new InMemoryQueue<T>(name);
   }
@@ -218,10 +267,16 @@ export async function getJobStatus(queue: Queue | InMemoryQueue<any>, jobId: str
 // ─── Worker Factory ───────────────────────────────────────────────────────────
 export function createWorker<T>(queueName: string, processor: (job: Job<T>) => Promise<unknown>) {
   if (!connection) {
-    logger.warn(
-      { queue: queueName, service: 'snapshop-backend' },
-      'Using in-memory fallback worker because Redis is unavailable'
-    );
+    logger.warn({ queue: queueName }, 'Using in-memory worker in development');
+    const queueMap: Record<string, InMemoryQueue<any>> = {
+      emr: emrQueue as InMemoryQueue<any>,
+      webhook: webhookQueue as InMemoryQueue<any>,
+      broadcast: broadcastQueue as InMemoryQueue<any>,
+    };
+    const targetQueue = queueMap[queueName];
+    if (targetQueue) {
+      targetQueue.setProcessor(processor as (job: Job<any>) => Promise<unknown>);
+    }
     return {
       on: () => undefined,
       close: async () => undefined,

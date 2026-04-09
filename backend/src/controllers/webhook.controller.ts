@@ -6,6 +6,9 @@ import { config } from '../config/config.js';
 export async function enqueueWebhookJob(req: Request, res: Response, next: NextFunction) {
   try {
     const { channel } = req.params;
+    if (!['whatsapp', 'instagram', 'facebook', 'tiktok'].includes(channel)) {
+      throw buildError('UNSUPPORTED_CHANNEL', `Unsupported channel: ${channel}`, 422);
+    }
     const job = await enqueueWebhookMessage(channel, req.body, (req as any).requestId);
     return res.status(202).json({ status: 'queued', job_id: job.id });
   } catch (err) {
