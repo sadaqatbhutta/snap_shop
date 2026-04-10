@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { RateLimiterRedis, RateLimiterRes } from 'rate-limiter-flexible';
+import { RateLimiterRedis, RateLimiterMemory, RateLimiterRes } from 'rate-limiter-flexible';
 import { connection } from '../queues/queue.js';
-import { config } from '../config/config.js';
 
 interface RateLimitOptions {
   windowMs: number;
@@ -16,16 +15,20 @@ function getClientIp(req: Request) {
 }
 
 export function rateLimiter({ windowMs, maxRequests, keyPrefix = 'rl' }: RateLimitOptions) {
-  if (!connection) {
-    return (_req: Request, _res: Response, next: NextFunction) => next();
-  }
+  const durationSec = Math.ceil(windowMs / 1000) || 1;
 
-  const limiter = new RateLimiterRedis({
-    storeClient: connection as any,
-    keyPrefix,
-    points: maxRequests,
-    duration: Math.ceil(windowMs / 1000),
-  });
+  const limiter = connection
+    ? new RateLimiterRedis({
+        storeClient: connection as any,
+        keyPrefix,
+        points: maxRequests,
+        duration: durationSec,
+      })
+    : new RateLimiterMemory({
+        keyPrefix,
+        points: maxRequests,
+        duration: durationSec,
+      });
 
   return async (req: Request, res: Response, next: NextFunction) => {
     try {

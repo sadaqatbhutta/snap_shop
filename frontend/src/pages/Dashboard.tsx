@@ -1,17 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { MessageSquare, Users, TrendingUp, Clock, ArrowUpRight, Megaphone, Loader2 } from 'lucide-react';
+import { MessageSquare, Users, TrendingUp, Clock, ArrowUpRight, Megaphone, ListChecks, CheckCircle2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useBusiness } from '../context/BusinessContext';
+import type { OnboardingProgress } from '../../../shared/types';
 import { db } from '../firebase';
-import { collection, query, orderBy, limit, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { Conversation, Broadcast } from '../../../shared/types';
 import { staggerContainer, staggerItem, fadeUp } from '../lib/animations';
 import { DashboardSkeleton } from '../components/Skeleton';
 
 export default function Dashboard() {
-  const { businessId } = useBusiness();
+  const { businessId, business, refreshBusiness } = useBusiness();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
   const [customerCount, setCustomerCount] = useState(0);
@@ -19,6 +20,18 @@ export default function Dashboard() {
   const [totalActiveChats, setTotalActiveChats] = useState(0);
   const [totalBroadcastsSent, setTotalBroadcastsSent] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [convTotal, setConvTotal] = useState(0);
+  const [agentTotal, setAgentTotal] = useState(0);
+
+  useEffect(() => {
+    if (!businessId) return;
+    getDocs(collection(db, `businesses/${businessId}/conversations`))
+      .then(s => setConvTotal(s.size))
+      .catch(() => setConvTotal(0));
+    getDocs(collection(db, `businesses/${businessId}/agents`))
+      .then(s => setAgentTotal(s.size))
+      .catch(() => setAgentTotal(0));
+  }, [businessId]);
 
   useEffect(() => {
     if (!businessId) return;
@@ -64,6 +77,33 @@ export default function Dashboard() {
 
   const activeCount = totalActiveChats;
 
+  const ob: Partial<OnboardingProgress> = business?.onboarding ?? {};
+  const aiKnowledgeDone =
+    (business?.faqs?.length ?? 0) > 0 ||
+    (business?.aiContext?.length ?? 0) > 120 ||
+    ob.faqsAdded ||
+    ob.aiContextFilled;
+  const teamDone = agentTotal > 0 || ob.teamInvited;
+  const chatsDone = convTotal > 0 || ob.firstTestChat;
+  const channelsDone = ob.channelReviewed;
+
+  const onboardingItems = [
+    { done: aiKnowledgeDone, label: 'Teach the AI (context + FAQs)', href: '/ai-settings' },
+    { done: channelsDone, label: 'Configure channel webhooks', href: '/settings', manualKey: 'channelReviewed' as const },
+    { done: teamDone, label: 'Invite a teammate', href: '/settings' },
+    { done: chatsDone, label: 'Receive your first customer message', href: '/conversations' },
+  ];
+
+  const onboardingComplete = onboardingItems.every(i => i.done);
+
+  const markOnboarding = async (key: keyof OnboardingProgress) => {
+    if (!businessId) return;
+    await updateDoc(doc(db, 'businesses', businessId), {
+      onboarding: { ...ob, [key]: true },
+    });
+    await refreshBusiness();
+  };
+
   const stats = [
     { label: 'Total Conversations', value: totalConversations.toString(), icon: MessageSquare, color: 'text-indigo-600', bg: 'bg-indigo-50' },
     { label: 'Active Customers', value: customerCount.toString(), icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
@@ -77,6 +117,48 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
+      {!onboardingComplete && (
+        <motion.div
+          className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-xl p-6 text-white shadow-lg"
+          variants={fadeUp}
+          initial="initial"
+          animate="animate"
+        >
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-white/15 rounded-xl shrink-0">
+              <ListChecks className="w-6 h-6" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-lg font-bold">Getting started</h2>
+              <p className="text-sm text-indigo-100 mt-1">Complete these steps to get the most from SnapShop.</p>
+              <ul className="mt-4 space-y-2">
+                {onboardingItems.map(item => (
+                  <li key={item.label} className="flex items-center gap-3 text-sm">
+                    {item.done ? (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-300 shrink-0" />
+                    ) : (
+                      <span className="w-5 h-5 rounded-full border-2 border-white/50 shrink-0" />
+                    )}
+                    <Link to={item.href} className={cn('hover:underline font-medium', item.done ? 'text-indigo-100 line-through opacity-80' : '')}>
+                      {item.label}
+                    </Link>
+                    {!item.done && item.manualKey === 'channelReviewed' && (
+                      <button
+                        type="button"
+                        onClick={() => void markOnboarding('channelReviewed')}
+                        className="ml-auto text-xs font-semibold bg-white/20 hover:bg-white/30 px-2 py-1 rounded-lg shrink-0"
+                      >
+                        Mark done
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       <motion.div
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
         variants={staggerContainer}

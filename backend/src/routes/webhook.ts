@@ -4,6 +4,6 @@ import { enqueueWebhookJob, getWebhookJobStatus, verifyWebhookChallenge } from '
 
 export const webhookRouter = Router();
 
+webhookRouter.get('/job/:jobId', getWebhookJobStatus);
 webhookRouter.post('/:channel', verifyChannelWebhookSignature, enqueueWebhookJob);
 webhookRouter.get('/:channel', verifyWebhookChallenge);
-webhookRouter.get('/job/:jobId', getWebhookJobStatus);

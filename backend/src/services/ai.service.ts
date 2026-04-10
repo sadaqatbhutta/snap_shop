@@ -80,3 +80,143 @@ export async function processAIMessage(message: string, conversationId: string, 
 
   return runAIPipeline(message, businessId, history);
 }
+
+export async function suggestReplyForConversation(businessId: string, conversationId: string) {
+  const conversationRef = db.doc(`businesses/${businessId}/conversations/${conversationId}`);
+  const conversationSnap = await conversationRef.get();
+  if (!conversationSnap.exists) {
+    throw new Error('Conversation not found');
+  }
+
+  const messagesRef = db.collection(`businesses/${businessId}/conversations/${conversationId}/messages`);
+  const historySnap = await messagesRef.orderBy('timestamp', 'desc').limit(12).get();
+  const historyDocs = historySnap.docs.reverse().map(doc => doc.data() as any);
+  const lastCustomerMessage = [...historyDocs].reverse().find(m => m.senderType === 'customer')?.content || '';
+  if (!lastCustomerMessage) {
+    return { suggestedReply: 'Thanks for reaching out. How can I help you today?' };
+  }
+
+  const result = await runAIPipeline(
+    lastCustomerMessage,
+    businessId,
+    historyDocs.map(m => ({
+      role: (m.senderType === 'customer' ? 'user' : 'model') as 'user' | 'model',
+      content: m.content as string,
+    }))
+  );
+
+  return {
+    suggestedReply: result.reply,
+    intent: result.intent,
+    confidence: result.confidence,
+  };
+}
+
+export async function generateBroadcastCopy(
+  businessId: string,
+  objective: string,
+  segmentName?: string,
+  templateName?: string
+) {
+  const bizSnap = await db.doc(`businesses/${businessId}`).get();
+  const biz = bizSnap.data() || {};
+  const businessName = biz.name || 'the business';
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.0-flash',
+    contents: [
+      {
+        role: 'user' as any,
+        parts: [{
+          text: `Create a concise broadcast campaign idea for ${businessName}.
+Objective: ${objective}
+Segment: ${segmentName || 'general audience'}
+Template context: ${templateName || 'not provided'}
+
+Return JSON with fields:
+- campaignName
+- rationale (short)
+`,
+        }],
+      },
+    ],
+    config: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          campaignName: { type: Type.STRING },
+          rationale: { type: Type.STRING },
+        },
+        required: ['campaignName', 'rationale'],
+      },
+    },
+  });
+
+  const parsed = JSON.parse(response.text || '{}');
+  return {
+    campaignName: parsed.campaignName || 'New Campaign',
+    rationale: parsed.rationale || 'Generated from campaign objective.',
+  };
+}
+
+export async function summarizeConversation(businessId: string, conversationId: string) {
+  const convRef = db.doc(`businesses/${businessId}/conversations/${conversationId}`);
+  const convSnap = await convRef.get();
+  if (!convSnap.exists) {
+    throw new Error('Conversation not found');
+  }
+
+  const bizSnap = await db.doc(`businesses/${businessId}`).get();
+  const businessName = (bizSnap.data()?.name as string) || 'the business';
+
+  const messagesRef = db.collection(`businesses/${businessId}/conversations/${conversationId}/messages`);
+  const snap = await messagesRef.orderBy('timestamp', 'desc').limit(40).get();
+  const lines = snap.docs
+    .reverse()
+    .map(d => {
+      const x = d.data() as Record<string, unknown>;
+      const who =
+        x.senderType === 'customer' ? 'Customer' : x.senderType === 'ai' ? 'AI' : 'Agent';
+      return `${who}: ${x.content}`;
+    })
+    .join('\n');
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.0-flash',
+    contents: [
+      {
+        role: 'user' as any,
+        parts: [{
+          text: `Summarize this customer support thread for "${businessName}" in plain language.
+Provide a short summary (3-6 sentences) and one recommended next action for a human agent.
+Conversation:
+${lines || '(empty)'}`,
+        }],
+      },
+    ],
+    config: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          summary: { type: Type.STRING },
+          nextAction: { type: Type.STRING },
+        },
+        required: ['summary', 'nextAction'],
+      },
+    },
+  });
+
+  const parsed = JSON.parse(response.text || '{}');
+  const summary = String(parsed.summary || '').trim() || 'No summary available.';
+  const nextAction = String(parsed.nextAction || '').trim() || 'Follow up with the customer if needed.';
+
+  await convRef.update({
+    threadSummary: summary,
+    threadSummaryNextAction: nextAction,
+    updatedAt: new Date().toISOString(),
+  });
+
+  return { summary, nextAction };
+}

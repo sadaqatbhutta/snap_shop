@@ -9,6 +9,10 @@ vi.mock('../src/services/ai.service.js', () => ({
     reply: 'Sure, here is the answer.',
     shouldEscalate: false,
   })),
+  summarizeConversation: vi.fn(async () => ({
+    summary: 'Customer asked about hours and pricing.',
+    nextAction: 'Confirm stock availability if they reply.',
+  })),
 }));
 
 vi.mock('../src/services/webhook.service.js', () => ({
@@ -64,6 +68,17 @@ describe('AI and Webchat endpoints', () => {
     expect(res.status).toBe(200);
     expect(res.body.intent).toBe('inquiry');
     expect(res.body.reply).toBeTruthy();
+  });
+
+  it('summarizes a thread via /api/ai/summarize', async () => {
+    const res = await request(app)
+      .post('/api/ai/summarize')
+      .set('Authorization', 'Bearer test-token')
+      .send({ businessId: 'biz-1', conversationId: 'conv-1' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.summary).toContain('hours');
+    expect(res.body.nextAction).toBeTruthy();
   });
 
   it('accepts webchat message via /api/webchat/message', async () => {

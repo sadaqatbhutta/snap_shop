@@ -5,13 +5,14 @@
 
 import React, { useEffect, useState } from 'react';
 import { motion, useMotionValue, useTransform, animate } from 'motion/react';
-import { BarChart, LineChart, Calendar, ChevronDown, Loader2 } from 'lucide-react';
+import { BarChart, LineChart, Calendar, ChevronDown } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useBusiness } from '../context/BusinessContext';
 import { db } from '../firebase';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { Conversation, Message } from '../../../shared/types';
 import { staggerContainer, staggerItem, fadeUp } from '../lib/animations';
+import { AnalyticsSkeleton } from '../components/Skeleton';
 
 interface Stats {
   convsByDay: number[];
@@ -100,7 +101,7 @@ export default function Analytics() {
   }, [businessId, rangeDays]);
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>;
+    return <AnalyticsSkeleton />;
   }
 
   const maxConv = Math.max(...(stats?.convsByDay || [1]), 1);

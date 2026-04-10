@@ -3,6 +3,7 @@ import axios from 'axios';
 import { db } from '../config/firebase.js';
 import { config } from '../config/config.js';
 import { buildError } from '../utils/errors.js';
+import { recordAuditEvent } from './audit.service.js';
 
 interface InvitePayload {
   businessId: string;
@@ -38,6 +39,14 @@ export async function inviteAgentToTeam(payload: InvitePayload, requestId: strin
   };
 
   await inviteRef.set(inviteData);
+  if (user?.uid) {
+    await recordAuditEvent({
+      businessId: payload.businessId,
+      actorUid: user.uid,
+      action: 'team.invite_created',
+      meta: { role: payload.role },
+    });
+  }
   const inviteUrl = `${config.APP_URL}/join?token=${token}`;
 
   let emailSent = false;

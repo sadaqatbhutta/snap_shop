@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useNavigate } from 'react-router-dom';
 import {
   Settings as SettingsIcon, Lock, Globe, CreditCard, ChevronRight,
   Mail, AlertTriangle, PhoneCall, Clock, Save, Loader2, CheckCircle2,
@@ -13,6 +14,8 @@ import { collection, onSnapshot, query, orderBy, doc, updateDoc } from 'firebase
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { staggerContainer, staggerItem, fadeUp, scaleIn } from '../lib/animations';
 import WebchatWidget from '../components/WebchatWidget';
+import { logout } from '../services/authService';
+import type { AIMacro } from '../../../shared/types';
 
 type Panel = null | 'integrations' | 'security' | 'billing' | 'team';
 
@@ -436,6 +439,7 @@ function TeamPanel({ businessId, onClose }: { businessId: string; onClose: () =>
       });
       if (!resp.ok) throw new Error();
       const data = await resp.json();
+      await updateDoc(doc(db, 'businesses', businessId), { 'onboarding.teamInvited': true });
       setInviteEmail('');
       if (data.emailSent === false) {
         alert(`Invite created, but email delivery is not configured.\nShare this link manually:\n${data.inviteUrl}`);
@@ -526,6 +530,7 @@ function TeamPanel({ businessId, onClose }: { businessId: string; onClose: () =>
 // ─── Main Settings Page ───────────────────────────────────────────────────────
 export default function Settings() {
   const { business, businessId, refreshBusiness } = useBusiness();
+  const navigate = useNavigate();
   const [businessName, setBusinessName] = useState('');
   const [businessEmail, setBusinessEmail] = useState('');
   const [notifications, setNotifications] = useState({
@@ -533,7 +538,12 @@ export default function Settings() {
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [activePanel, setActivePanel] = useState<Panel>(null);
+  const [aiMacros, setAiMacros] = useState<AIMacro[]>([]);
+  const [macroLabel, setMacroLabel] = useState('');
+  const [macroContent, setMacroContent] = useState('');
 
   useEffect(() => {
     if (business) {
@@ -542,6 +552,7 @@ export default function Settings() {
       if ((business as any).notifications) {
         setNotifications((business as any).notifications);
       }
+      setAiMacros(business.aiMacros ?? []);
     }
   }, [business]);
 
@@ -552,6 +563,7 @@ export default function Settings() {
       name: businessName,
       ownerEmail: businessEmail,
       notifications,
+      aiMacros,
     });
     await refreshBusiness();
     setSaving(false);
@@ -568,6 +580,32 @@ export default function Settings() {
     { icon: Globe, label: 'Integrations', description: 'Connect WhatsApp, Instagram, and more.', panel: 'integrations' as const },
     { icon: CreditCard, label: 'Billing', description: 'Manage your subscription and payments.', panel: 'billing' as const },
   ];
+
+  const handleDeleteAccount = async () => {
+    if (!businessId) return;
+    setDeletingAccount(true);
+
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const resp = await fetch(`/api/business/${businessId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}));
+        throw new Error(data.message || 'Failed to delete account');
+      }
+      await logout();
+      navigate('/');
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete account');
+    } finally {
+      setDeletingAccount(false);
+      setDeleteModalOpen(false);
+    }
+  };
 
   return (
     <motion.div
@@ -618,6 +656,62 @@ export default function Settings() {
             {businessId || 'Loading...'}
           </code>
           <p className="text-xs text-indigo-500 mt-2">Use this as <code>business_id</code> in webhook payloads.</p>
+        </div>
+      </motion.div>
+
+      {/* Quick replies (macros / playbooks) */}
+      <motion.div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm space-y-6" variants={staggerItem}>
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-emerald-50 rounded-lg"><MessageSquare className="w-6 h-6 text-emerald-600" /></div>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Quick replies</h3>
+            <p className="text-sm text-gray-500">Saved snippets agents can insert in Conversations (playbook macros).</p>
+          </div>
+        </div>
+        <div className="space-y-3">
+          {aiMacros.map(m => (
+            <div key={m.id} className="flex gap-2 items-start p-3 border border-gray-100 rounded-lg bg-gray-50/80">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">{m.label}</p>
+                <p className="text-sm text-gray-800 whitespace-pre-wrap mt-1">{m.content}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAiMacros(prev => prev.filter(x => x.id !== m.id))}
+                className="text-xs font-semibold text-red-600 hover:underline shrink-0"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+            <input
+              type="text"
+              placeholder="Label (e.g. Shipping policy)"
+              value={macroLabel}
+              onChange={e => setMacroLabel(e.target.value)}
+              className="px-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                if (!macroLabel.trim() || !macroContent.trim()) return;
+                setAiMacros(prev => [...prev, { id: crypto.randomUUID(), label: macroLabel.trim(), content: macroContent.trim() }]);
+                setMacroLabel('');
+                setMacroContent('');
+              }}
+              className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700"
+            >
+              Add macro
+            </button>
+          </div>
+          <textarea
+            rows={3}
+            placeholder="Message text to insert…"
+            value={macroContent}
+            onChange={e => setMacroContent(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
+          />
         </div>
       </motion.div>
 
@@ -696,7 +790,7 @@ export default function Settings() {
           <h4 className="font-semibold text-red-900">Danger Zone</h4>
           <p className="text-sm text-red-700">Permanently delete your business account and all associated data.</p>
         </div>
-        <button className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors">
+        <button onClick={() => setDeleteModalOpen(true)} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors">
           Delete Account
         </button>
       </motion.div>
@@ -729,6 +823,52 @@ export default function Settings() {
             <CheckCircle2 className="w-5 h-5" />
             <span className="font-semibold">Settings saved successfully!</span>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {deleteModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+              variants={scaleIn}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
+              <div className="p-6 border-b border-gray-100 bg-red-600 text-white">
+                <h3 className="text-xl font-bold">Delete Business Account</h3>
+                <p className="text-sm text-red-100 mt-1">This action is permanent and cannot be undone.</p>
+              </div>
+              <div className="p-6 space-y-4">
+                <p className="text-sm text-gray-700">
+                  Deleting your account will remove your business profile, conversations, broadcasts, customers, and team data.
+                </p>
+                <p className="text-xs text-gray-500">
+                  Make sure you have exported anything important before continuing.
+                </p>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteModalOpen(false)}
+                    disabled={deletingAccount}
+                    className="flex-1 px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-60"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteAccount}
+                    disabled={deletingAccount}
+                    className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-60 flex items-center justify-center gap-2"
+                  >
+                    {deletingAccount && <Loader2 className="w-4 h-4 animate-spin" />}
+                    Delete Permanently
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </motion.div>

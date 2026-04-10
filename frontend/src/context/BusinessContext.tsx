@@ -60,6 +60,14 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
           ownerEmail: user.email ?? '',
           createdAt: new Date().toISOString(),
           confidenceThreshold: 0.7,
+          onboarding: {
+            faqsAdded: false,
+            aiContextFilled: false,
+            teamInvited: false,
+            channelReviewed: false,
+            firstTestChat: false,
+          },
+          aiMacros: [],
         };
         try {
           await withTimeout(setDoc(bizRef, newBusiness), FIRESTORE_BOOTSTRAP_TIMEOUT_MS, 'Business create');
@@ -82,6 +90,14 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
           ownerEmail: user.email ?? '',
           createdAt: new Date().toISOString(),
           confidenceThreshold: 0.7,
+          onboarding: {
+            faqsAdded: false,
+            aiContextFilled: false,
+            teamInvited: false,
+            channelReviewed: false,
+            firstTestChat: false,
+          },
+          aiMacros: [],
         };
         setBusiness(defaultBusiness);
       }

@@ -25,6 +25,9 @@ export default function Broadcasts() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ name: '', templateId: '', segmentId: '', scheduledAt: '' });
+  const [campaignObjective, setCampaignObjective] = useState('');
+  const [generatingCampaign, setGeneratingCampaign] = useState(false);
+  const [campaignHint, setCampaignHint] = useState('');
 
   useEffect(() => {
     if (!businessId) return;
@@ -118,6 +121,36 @@ export default function Broadcasts() {
     } catch (err) {
       console.error(err);
       alert('Failed to delete broadcast');
+    }
+  };
+
+  const handleGenerateCampaign = async () => {
+    if (!businessId || !campaignObjective.trim() || generatingCampaign) return;
+    setGeneratingCampaign(true);
+    setCampaignHint('');
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const selectedTemplate = templates.find(t => t.id === form.templateId);
+      const selectedSegment = segments.find(s => s.id === form.segmentId);
+      const resp = await fetch('/api/ai/generate-broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({
+          businessId,
+          objective: campaignObjective.trim(),
+          segmentName: selectedSegment?.name,
+          templateName: selectedTemplate?.name,
+        }),
+      });
+      if (!resp.ok) throw new Error('Failed to generate campaign');
+      const data = await resp.json();
+      setForm(prev => ({ ...prev, name: data.campaignName || prev.name }));
+      setCampaignHint(data.rationale || '');
+    } catch (err) {
+      console.error(err);
+      alert('Could not generate campaign right now.');
+    } finally {
+      setGeneratingCampaign(false);
     }
   };
 
@@ -309,6 +342,27 @@ export default function Broadcasts() {
               <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white/20 rounded-full"><X className="w-5 h-5" /></button>
             </div>
             <form onSubmit={handleCreate} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Campaign Objective (AI)</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="e.g. increase weekend orders by 20%"
+                    value={campaignObjective}
+                    onChange={e => setCampaignObjective(e.target.value)}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleGenerateCampaign}
+                    disabled={generatingCampaign || !campaignObjective.trim()}
+                    className="px-3 py-2 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg hover:bg-indigo-100 disabled:opacity-60"
+                  >
+                    {generatingCampaign ? 'Generating...' : 'AI Generate'}
+                  </button>
+                </div>
+                {campaignHint && <p className="text-xs text-gray-500 mt-1">{campaignHint}</p>}
+              </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Broadcast Name</label>
                 <input required type="text" placeholder="e.g. Eid Special Offer" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}

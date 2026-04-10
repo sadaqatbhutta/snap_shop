@@ -1,18 +1,28 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Search, Filter, Send, User, Bot, Info, AlertTriangle, Loader2, XCircle, Zap
+  Search, Filter, Send, User, Bot, Info, AlertTriangle, Loader2, XCircle, Zap, Download, Sparkles,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useBusiness } from '../context/BusinessContext';
 import { db } from '../firebase';
 import {
-  collection, query, orderBy, onSnapshot, updateDoc, doc, limit
+  collection, query, orderBy, onSnapshot, updateDoc, doc, limit, arrayUnion, getDocs,
 } from 'firebase/firestore';
-import { Conversation, Message } from '../../../shared/types';
+import { Conversation, Message, InternalNote } from '../../../shared/types';
 import { auth } from '../firebase';
 import { slideInRight, fadeIn } from '../lib/animations';
 import { ConversationsSkeleton } from '../components/Skeleton';
+
+function shortWait(iso?: string) {
+  if (!iso) return null;
+  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (m < 1) return '<1 min ago';
+  if (m < 60) return `${m} min ago`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
 
 const CHANNEL_COLORS: Record<string, string> = {
   whatsapp: 'bg-green-100 text-green-800',
@@ -23,7 +33,7 @@ const CHANNEL_COLORS: Record<string, string> = {
 };
 
 export default function Conversations() {
-  const { businessId } = useBusiness();
+  const { businessId, business } = useBusiness();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -32,6 +42,10 @@ export default function Conversations() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'human_escalated' | 'closed'>('all');
   const [showInfo, setShowInfo] = useState(false);
+  const [suggestingReply, setSuggestingReply] = useState(false);
+  const [summarizing, setSummarizing] = useState(false);
+  const [noteDraft, setNoteDraft] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState<'all' | 'hot' | 'needs_review'>('all');
   const [nowForUrgent, setNowForUrgent] = useState(Date.now());
   const [loading, setLoading] = useState(true);
   
@@ -136,6 +150,101 @@ export default function Conversations() {
     }
   };
 
+  const handleSummarizeThread = async () => {
+    if (!businessId || !selectedId || summarizing) return;
+    setSummarizing(true);
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const resp = await fetch('/api/ai/summarize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ businessId, conversationId: selectedId }),
+      });
+      if (!resp.ok) throw new Error('Failed to summarize');
+    } catch (err) {
+      console.error(err);
+      alert('Could not summarize this thread right now.');
+    } finally {
+      setSummarizing(false);
+    }
+  };
+
+  const addInternalNote = async () => {
+    if (!businessId || !selectedId || !noteDraft.trim()) return;
+    const note: InternalNote = {
+      id: crypto.randomUUID(),
+      text: noteDraft.trim(),
+      createdAt: new Date().toISOString(),
+      authorUid: auth.currentUser?.uid,
+    };
+    await updateDoc(doc(db, `businesses/${businessId}/conversations`, selectedId), {
+      internalNotes: arrayUnion(note),
+      updatedAt: new Date().toISOString(),
+    });
+    setNoteDraft('');
+  };
+
+  const exportConversationsCsv = async () => {
+    if (!businessId) return;
+    try {
+      const snap = await getDocs(collection(db, `businesses/${businessId}/conversations`));
+      const header = ['id', 'customer', 'channel', 'status', 'leadPriority', 'leadScore', 'needsReview', 'updatedAt'];
+      const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
+      const lines = [
+        header.join(','),
+        ...snap.docs.map(d => {
+          const x = d.data() as Record<string, unknown>;
+          return [
+            d.id,
+            String(x.customerName ?? ''),
+            String(x.channel ?? ''),
+            String(x.status ?? ''),
+            String(x.leadPriority ?? ''),
+            String(x.leadScore ?? ''),
+            String(x.needsHumanReview ?? false),
+            String(x.updatedAt ?? ''),
+          ].map(esc).join(',');
+        }),
+      ];
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `conversations-export.csv`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (err) {
+      console.error(err);
+      alert('Export failed.');
+    }
+  };
+
+  const handleSuggestReply = async () => {
+    if (!businessId || !selectedId || suggestingReply || selected?.status === 'closed') return;
+    setSuggestingReply(true);
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const resp = await fetch('/api/ai/suggest-reply', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ businessId, conversationId: selectedId }),
+      });
+      if (!resp.ok) throw new Error('Failed to generate suggested reply');
+      const data = await resp.json();
+      setInput(data.suggestedReply || '');
+    } catch (err) {
+      console.error(err);
+      alert('Could not generate a reply suggestion right now.');
+    } finally {
+      setSuggestingReply(false);
+    }
+  };
+
   const updateStatus = async (status: 'active' | 'closed' | 'human_escalated') => {
     if (!businessId || !selectedId) return;
     await updateDoc(doc(db, `businesses/${businessId}/conversations`, selectedId), {
@@ -144,13 +253,22 @@ export default function Conversations() {
     });
   };
 
-  const filtered = conversations.filter(c =>
-    (statusFilter === 'all' || c.status === statusFilter) &&
-    (
-      c.customerName?.toLowerCase().includes(search.toLowerCase()) ||
-      c.lastMessage?.toLowerCase().includes(search.toLowerCase())
-    )
-  );
+  const filtered = conversations.filter(c => {
+    if (!(statusFilter === 'all' || c.status === statusFilter)) return false;
+    if (priorityFilter === 'hot' && c.leadPriority !== 'hot') return false;
+    if (priorityFilter === 'needs_review' && !c.needsHumanReview) return false;
+    const q = search.toLowerCase();
+    return (
+      c.customerName?.toLowerCase().includes(q) ||
+      c.lastMessage?.toLowerCase().includes(q)
+    );
+  });
+
+  const sortedChats = [...filtered].sort((a, b) => {
+    const d = (b.leadScore ?? 0) - (a.leadScore ?? 0);
+    if (d !== 0) return d;
+    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+  });
 
   if (loading) {
     return <ConversationsSkeleton />;
@@ -171,29 +289,56 @@ export default function Conversations() {
               className="w-full pl-10 pr-4 py-2 bg-gray-100 border-none rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
             />
           </div>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  const order: Array<'all' | 'active' | 'human_escalated' | 'closed'> = ['all', 'active', 'human_escalated', 'closed'];
+                  const idx = order.indexOf(statusFilter);
+                  setStatusFilter(order[(idx + 1) % order.length]);
+                }}
+                className="flex items-center gap-2 text-xs font-medium text-gray-600 hover:text-indigo-600 transition-colors"
+                title="Cycle filter: all, active, urgent, closed"
+              >
+                <Filter className="w-3 h-3" /> Status
+              </button>
+              <span className="text-xs text-gray-400">
+                {statusFilter === 'all' ? `${conversations.filter(c => c.status !== 'closed').length} active` : `Status: ${statusFilter.replace('_', ' ')}`}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  const order = ['all', 'hot', 'needs_review'] as const;
+                  const idx = order.indexOf(priorityFilter);
+                  setPriorityFilter(order[(idx + 1) % order.length]);
+                }}
+                className="flex items-center gap-2 text-xs font-medium text-gray-600 hover:text-amber-600 transition-colors"
+                title="Lead queue: all, hot leads, needs review"
+              >
+                <Zap className="w-3 h-3" /> Queue
+              </button>
+              <span className="text-xs text-gray-400">
+                {priorityFilter === 'all' ? 'All leads' : priorityFilter === 'hot' ? 'Hot only' : 'Review queue'}
+              </span>
+            </div>
             <button
-              onClick={() => {
-                const order: Array<'all' | 'active' | 'human_escalated' | 'closed'> = ['all', 'active', 'human_escalated', 'closed'];
-                const idx = order.indexOf(statusFilter);
-                setStatusFilter(order[(idx + 1) % order.length]);
-              }}
-              className="flex items-center gap-2 text-xs font-medium text-gray-600 hover:text-indigo-600 transition-colors"
-              title="Cycle filter: all, active, urgent, closed"
+              type="button"
+              onClick={() => void exportConversationsCsv()}
+              className="flex items-center justify-center gap-2 w-full py-2 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg hover:bg-indigo-100"
             >
-              <Filter className="w-3 h-3" /> Filter
+              <Download className="w-3.5 h-3.5" /> Export CRM (CSV)
             </button>
-            <span className="text-xs text-gray-400">
-              {statusFilter === 'all' ? `${conversations.filter(c => c.status !== 'closed').length} active` : `Filter: ${statusFilter.replace('_', ' ')}`}
-            </span>
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
-          {filtered.length === 0 && (
+          {sortedChats.length === 0 && (
             <p className="p-10 text-sm text-gray-400 text-center italic">No conversations found.</p>
           )}
-          {filtered.map(chat => {
+          {sortedChats.map(chat => {
             const isUrgent = chat.status === 'human_escalated' && 
                             (nowForUrgent - new Date(chat.updatedAt).getTime()) < 60000;
             
@@ -230,13 +375,21 @@ export default function Conversations() {
                   <p className={cn("text-xs truncate flex-1", selectedId === chat.id ? "text-gray-700" : "text-gray-500")}>
                     {chat.lastMessage}
                   </p>
-                  <div className={cn(
-                    'text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-tighter',
-                    chat.status === 'active' ? 'bg-green-100 text-green-700' :
-                    chat.status === 'human_escalated' ? 'bg-red-100 text-red-700' :
-                    'bg-gray-200 text-gray-600'
-                  )}>
-                    {chat.status === 'human_escalated' ? 'Urgent' : chat.status}
+                  <div className="flex flex-col items-end gap-0.5 shrink-0">
+                    {chat.leadPriority === 'hot' && (
+                      <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 uppercase">Hot</span>
+                    )}
+                    {chat.needsHumanReview && (
+                      <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-violet-100 text-violet-800 uppercase">Review</span>
+                    )}
+                    <div className={cn(
+                      'text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-tighter',
+                      chat.status === 'active' ? 'bg-green-100 text-green-700' :
+                      chat.status === 'human_escalated' ? 'bg-red-100 text-red-700' :
+                      'bg-gray-200 text-gray-600'
+                    )}>
+                      {chat.status === 'human_escalated' ? 'Urgent' : chat.status}
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -267,7 +420,17 @@ export default function Conversations() {
                 <p className="text-xs text-gray-400 capitalize flex items-center gap-1.5">
                   <span className={cn('block w-1.5 h-1.5 rounded-full', selected.status === 'closed' ? 'bg-gray-300' : 'bg-green-500')} />
                   {selected.channel} · {selected.status.replace('_', ' ')}
+                  {selected.leadPriority && (
+                    <span className="ml-1 normal-case text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+                      {selected.leadPriority} · {selected.leadScore ?? '—'}
+                    </span>
+                  )}
                 </p>
+                {selected.lastCustomerMessageAt && (
+                  <p className="text-[10px] text-gray-400 mt-0.5">
+                    Last customer message: {shortWait(selected.lastCustomerMessageAt)}
+                  </p>
+                )}
               </div>
             </div>
             
@@ -366,6 +529,34 @@ export default function Conversations() {
             ) : (
               <form onSubmit={sendMessage} className="flex flex-col gap-3">
                 <div className="relative group">
+                  <div className="mb-2 flex flex-wrap items-center justify-end gap-2">
+                    {(business?.aiMacros?.length ?? 0) > 0 && (
+                      <select
+                        className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 max-w-[140px]"
+                        defaultValue=""
+                        onChange={e => {
+                          const id = e.target.value;
+                          const m = business?.aiMacros?.find(x => x.id === id);
+                          if (m) setInput(prev => (prev ? `${prev}\n${m.content}` : m.content));
+                          e.target.value = '';
+                        }}
+                      >
+                        <option value="">Insert macro…</option>
+                        {business?.aiMacros?.map(m => (
+                          <option key={m.id} value={m.id}>{m.label}</option>
+                        ))}
+                      </select>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleSuggestReply}
+                      disabled={suggestingReply}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg hover:bg-indigo-100 disabled:opacity-60"
+                    >
+                      {suggestingReply ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+                      AI Suggest Reply
+                    </button>
+                  </div>
                   <textarea
                     rows={3}
                     value={input}
@@ -396,10 +587,66 @@ export default function Conversations() {
             )}
           </div>
           {showInfo && (
-            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 text-xs text-gray-600 space-y-1">
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 text-xs text-gray-600 space-y-3 max-h-64 overflow-y-auto">
               <div><span className="font-semibold text-gray-800">Customer:</span> {selected.customerName || 'Unknown'}</div>
               <div><span className="font-semibold text-gray-800">Channel:</span> {selected.channel}</div>
               <div><span className="font-semibold text-gray-800">Conversation ID:</span> {selected.id}</div>
+              {selected.sentimentTags && selected.sentimentTags.length > 0 && (
+                <div>
+                  <span className="font-semibold text-gray-800">Signals:</span>{' '}
+                  {selected.sentimentTags.map(t => (
+                    <span key={t} className="inline-block mr-1 mb-1 px-1.5 py-0.5 rounded bg-white border border-gray-200 text-[10px] font-semibold">{t}</span>
+                  ))}
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold text-gray-800">AI summary</span>
+                <button
+                  type="button"
+                  onClick={() => void handleSummarizeThread()}
+                  disabled={summarizing}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-violet-600 text-white text-[10px] font-bold hover:bg-violet-700 disabled:opacity-60"
+                >
+                  {summarizing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                  Summarize
+                </button>
+              </div>
+              {selected.threadSummary ? (
+                <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{selected.threadSummary}</p>
+              ) : (
+                <p className="text-gray-400 italic">No summary yet. Run Summarize to generate one.</p>
+              )}
+              {selected.threadSummaryNextAction && (
+                <p className="text-gray-800"><span className="font-semibold">Next:</span> {selected.threadSummaryNextAction}</p>
+              )}
+              <div className="border-t border-gray-200 pt-2 mt-2">
+                <p className="font-semibold text-gray-800 mb-1">Internal notes (team only)</p>
+                <ul className="space-y-1 mb-2 max-h-24 overflow-y-auto">
+                  {(selected.internalNotes || []).map(n => (
+                    <li key={n.id} className="text-[11px] bg-white border border-gray-100 rounded p-2">
+                      <span className="text-gray-400">{new Date(n.createdAt).toLocaleString()}</span>
+                      <br />
+                      {n.text}
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={noteDraft}
+                    onChange={e => setNoteDraft(e.target.value)}
+                    placeholder="Add a note for your team…"
+                    className="flex-1 px-2 py-1.5 border border-gray-200 rounded-lg text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void addInternalNote()}
+                    className="px-3 py-1.5 bg-gray-800 text-white rounded-lg text-xs font-semibold hover:bg-gray-900"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
             </div>
           )}
           </motion.div>

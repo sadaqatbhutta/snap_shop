@@ -4,15 +4,17 @@ import { cn } from '../lib/utils';
 
 interface SkeletonProps {
   className?: string;
+  style?: React.CSSProperties;
 }
 
-export function Skeleton({ className }: SkeletonProps) {
+export function Skeleton({ className, style }: SkeletonProps) {
   return (
     <motion.div
       className={cn('bg-gray-200 rounded animate-pulse', className)}
-      initial={{ opacity: 0.6 }}
-      animate={{ opacity: [0.6, 1, 0.6] }}
-      transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+      style={style}
+      initial={{ opacity: 0.72 }}
+      animate={{ opacity: [0.72, 0.92, 0.72] }}
+      transition={{ duration: 2.1, repeat: Infinity, ease: [0.4, 0, 0.2, 1] }}
     />
   );
 }
@@ -150,6 +152,118 @@ export function CardSkeleton() {
       <div className="flex gap-2 pt-2">
         <Skeleton className="h-9 w-24 rounded-lg" />
         <Skeleton className="h-9 w-24 rounded-lg" />
+      </div>
+    </div>
+  );
+}
+
+export function AnalyticsSkeleton() {
+  return (
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-7 w-52" />
+        <Skeleton className="h-10 w-40 rounded-lg" />
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+            <Skeleton className="h-3 w-24 mb-3" />
+            <Skeleton className="h-8 w-20" />
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+          <Skeleton className="h-6 w-48 mb-6" />
+          <div className="h-48 flex items-end gap-1.5">
+            {[...Array(12)].map((_, i) => (
+              <Skeleton
+                key={i}
+                className="flex-1 rounded-t"
+                // Mimics bar-chart variance
+                style={{
+                  height: `${[20, 42, 35, 58, 30, 64, 72, 40, 28, 54, 68, 80][i]}%`,
+                } as React.CSSProperties}
+              />
+            ))}
+          </div>
+          <div className="flex justify-between mt-3">
+            <Skeleton className="h-2 w-12" />
+            <Skeleton className="h-2 w-12" />
+            <Skeleton className="h-2 w-12" />
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+          <Skeleton className="h-6 w-48 mb-6" />
+          <div className="space-y-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-3 w-8" />
+                </div>
+                <Skeleton className="h-2 w-full rounded-full" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+        <Skeleton className="h-6 w-40 mb-6" />
+        <div className="space-y-4">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-3 w-28" />
+                <Skeleton className="h-3 w-8" />
+              </div>
+              <Skeleton className="h-2 w-full rounded-full" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function AuthScreenSkeleton() {
+  return (
+    <div className="min-h-screen flex bg-white">
+      <div className="hidden lg:block lg:w-1/2 bg-indigo-600" />
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gray-50/50">
+        <div className="w-full max-w-md space-y-6">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-72" />
+          <div className="space-y-4">
+            <Skeleton className="h-12 w-full rounded-xl" />
+            <Skeleton className="h-12 w-full rounded-xl" />
+            <Skeleton className="h-12 w-full rounded-xl" />
+            <Skeleton className="h-12 w-full rounded-xl" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function JoinSkeleton() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+      <div className="max-w-md w-full bg-white p-10 rounded-3xl shadow-xl border border-gray-100 space-y-6">
+        <div className="flex justify-center">
+          <Skeleton className="w-16 h-16 rounded-2xl" />
+        </div>
+        <div className="space-y-3">
+          <Skeleton className="h-8 w-64 mx-auto" />
+          <Skeleton className="h-4 w-72 mx-auto" />
+          <Skeleton className="h-4 w-56 mx-auto" />
+        </div>
+        <div className="pt-2">
+          <Skeleton className="h-12 w-full rounded-2xl" />
+        </div>
+        <div className="pt-3 border-t border-gray-100">
+          <Skeleton className="h-3 w-40 mx-auto" />
+        </div>
       </div>
     </div>
   );

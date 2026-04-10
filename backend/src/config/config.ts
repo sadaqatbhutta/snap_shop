@@ -34,6 +34,7 @@ const ConfigSchema = z.object({
 
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60000),
   RATE_LIMIT_MAX_REQ: z.coerce.number().default(60),
+  RATE_LIMIT_AI_MAX_REQ: z.coerce.number().default(30),
   RATE_LIMIT_EMR_MAX_REQ: z.coerce.number().default(10),
 
   SMTP_API_URL: z.string().optional(),

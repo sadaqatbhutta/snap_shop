@@ -5,6 +5,20 @@
 
 export type Channel = 'whatsapp' | 'instagram' | 'facebook' | 'webchat' | 'tiktok';
 
+export interface OnboardingProgress {
+  faqsAdded: boolean;
+  aiContextFilled: boolean;
+  teamInvited: boolean;
+  channelReviewed: boolean;
+  firstTestChat: boolean;
+}
+
+export interface AIMacro {
+  id: string;
+  label: string;
+  content: string;
+}
+
 export interface Business {
   id: string;
   name: string;
@@ -14,6 +28,8 @@ export interface Business {
   ownerEmail: string;
   createdAt: string;
   confidenceThreshold: number;
+  onboarding?: OnboardingProgress;
+  aiMacros?: AIMacro[];
 }
 
 export interface Customer {
@@ -30,6 +46,15 @@ export interface Customer {
   lastInteractionAt: string;
 }
 
+export type LeadPriority = 'hot' | 'warm' | 'cold';
+
+export interface InternalNote {
+  id: string;
+  text: string;
+  createdAt: string;
+  authorUid?: string;
+}
+
 export interface Conversation {
   id: string;
   businessId: string;
@@ -40,6 +65,14 @@ export interface Conversation {
   status: 'active' | 'human_escalated' | 'closed';
   assignedAgentId?: string;
   aiConfidence?: number;
+  leadPriority?: LeadPriority;
+  leadScore?: number;
+  sentimentTags?: string[];
+  needsHumanReview?: boolean;
+  internalNotes?: InternalNote[];
+  threadSummary?: string;
+  threadSummaryNextAction?: string;
+  lastCustomerMessageAt?: string;
   createdAt: string;
   updatedAt: string;
 }

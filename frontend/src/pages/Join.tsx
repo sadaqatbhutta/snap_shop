@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { auth } from '../firebase';
 import { onAuthChange } from '../services/authService';
-import { Loader2, CheckCircle2, AlertCircle, Sparkles, Bot } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Sparkles, Bot } from 'lucide-react';
 import { motion } from 'motion/react';
+import { JoinSkeleton } from '../components/Skeleton';
 
 export default function Join() {
   const [searchParams] = useSearchParams();
@@ -50,6 +51,9 @@ export default function Join() {
   }, [token, navigate]);
 
   return (
+    <>
+      {status === 'loading' && <JoinSkeleton />}
+      {status !== 'loading' && (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
@@ -61,14 +65,6 @@ export default function Join() {
             <Bot className="w-10 h-10" />
           </div>
         </div>
-
-        {status === 'loading' && (
-          <div className="space-y-4">
-            <Loader2 className="w-10 h-10 animate-spin text-indigo-600 mx-auto" />
-            <h1 className="text-2xl font-black text-gray-900">Validating Invitation...</h1>
-            <p className="text-gray-500">Please wait while we process your request.</p>
-          </div>
-        )}
 
         {status === 'unauthorized' && (
           <div className="space-y-4">
@@ -109,5 +105,7 @@ export default function Join() {
         </div>
       </motion.div>
     </div>
+      )}
+    </>
   );
 }

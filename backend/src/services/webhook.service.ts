@@ -7,6 +7,8 @@ import { sendMessage } from './channelSender.js';
 import { logger } from '../utils/logger.js';
 import { WebhookPayload } from '../validations/webhook.js';
 import { runAIPipeline } from './ai.service.js';
+import { deriveConversationSignals } from '../utils/conversationSignals.js';
+import { redactForLogs } from '../utils/redact.js';
 
 export async function enqueueWebhookMessage(channel: string, body: Record<string, unknown>, requestId?: string) {
   return webhookQueue.add(
@@ -23,7 +25,7 @@ export async function getWebhookJobStatusById(jobId: string) {
 export async function processWebhookJob(channel: string, body: Record<string, unknown>) {
   const payload = normalizeMetaPayload(channel, body);
   if (!payload) {
-    logger.warn({ channel, body }, 'Ignored malformed webhook payload');
+    logger.warn({ channel, body: redactForLogs(body) }, 'Ignored malformed webhook payload');
     return { status: 'ignored' };
   }
 
@@ -149,49 +151,56 @@ export async function processWebhookJob(channel: string, body: Record<string, un
 
   let aiReply = 'Let me connect you with a human agent.';
   let aiIntent = 'unknown';
-  let aiConfidence = 0;
+  let aiConfidence: number | undefined;
   let shouldEscalate = false;
 
   // ─── AI Processing (only if not human-escalated) ─────────────────────────
   if (!isHumanHandling) {
     const aiResult = await runAIPipeline(content, businessId, history);
-    if (aiResult) {
-      aiReply = aiResult.reply;
-      aiIntent = aiResult.intent;
-      aiConfidence = aiResult.confidence;
-      shouldEscalate = aiResult.shouldEscalate;
+    aiReply = aiResult.reply;
+    aiIntent = aiResult.intent;
+    aiConfidence = aiResult.confidence;
+    shouldEscalate = aiResult.shouldEscalate;
 
-      // ─── FIX: Use confidence threshold from business settings ──────────
-      if (shouldEscalate) {
-        await db.doc(`businesses/${businessId}/conversations/${conversationId}`).update({ 
-          status: 'human_escalated',
-          updatedAt: new Date().toISOString(),
-        });
-      }
+    const aiMsgId = uuidv4();
+    await messagesRef.doc(aiMsgId).set({
+      id: aiMsgId,
+      conversationId,
+      businessId,
+      senderId: 'ai',
+      senderType: 'ai',
+      content: aiReply,
+      type: 'text',
+      intent: aiIntent,
+      timestamp: new Date().toISOString(),
+    });
 
-      const aiMsgId = uuidv4();
-      await messagesRef.doc(aiMsgId).set({
-        id: aiMsgId,
-        conversationId,
-        businessId,
-        senderId: 'ai',
-        senderType: 'ai',
-        content: aiReply,
-        type: 'text',
-        intent: aiIntent,
-        timestamp: new Date().toISOString(),
-      });
-
-      await db.doc(`businesses/${businessId}/conversations/${conversationId}`).update({
-        aiConfidence,
-        updatedAt: new Date().toISOString(),
-      });
-
-      await sendMessage(channel, userId, aiReply, businessId);
-    }
+    await sendMessage(channel, userId, aiReply, businessId);
   }
 
-  logger.info({ channel, userId, businessId, reply: aiReply, confidence: aiConfidence }, 'Processed incoming webhook');
+  const finalStatus: 'active' | 'human_escalated' =
+    isHumanHandling || shouldEscalate ? 'human_escalated' : 'active';
+  const signals = deriveConversationSignals(content, finalStatus, aiConfidence, shouldEscalate);
+  const lastMessageForUi = !isHumanHandling ? aiReply : content;
+
+  const convPatch: Record<string, unknown> = {
+    lastMessage: lastMessageForUi,
+    lastCustomerMessageAt: now,
+    updatedAt: new Date().toISOString(),
+    leadScore: signals.leadScore,
+    leadPriority: signals.leadPriority,
+    sentimentTags: signals.sentimentTags,
+    needsHumanReview: signals.needsHumanReview,
+  };
+  if (aiConfidence !== undefined) convPatch.aiConfidence = aiConfidence;
+  if (finalStatus === 'human_escalated') convPatch.status = 'human_escalated';
+
+  await db.doc(`businesses/${businessId}/conversations/${conversationId}`).update(convPatch);
+
+  logger.info(
+    { channel, userId, businessId, intent: aiIntent, confidence: aiConfidence ?? null, leadPriority: signals.leadPriority },
+    'Processed incoming webhook'
+  );
 
   // ─── Update Daily Stats ───────────────────────────────────────────────────
   const today = new Date().toISOString().split('T')[0];
@@ -218,7 +227,7 @@ export async function processWebhookJob(channel: string, body: Record<string, un
     conversationId,
     reply: aiReply,
     intent: aiIntent,
-    confidence: aiConfidence,
+    confidence: aiConfidence ?? 0,
   };
 }
 

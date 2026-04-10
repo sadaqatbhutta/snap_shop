@@ -9,6 +9,7 @@ import { onAuthChange, loginWithGoogle, loginWithEmail, registerWithEmail, logou
 import { Bot, LogIn, Mail, Lock, ArrowRight, UserPlus, AlertCircle, Eye, EyeOff, CheckCircle2, Sparkles, Users, MessageSquare, User as UserIcon, RefreshCw, Send, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth } from '../firebase';
+import { AuthScreenSkeleton } from './Skeleton';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -135,15 +136,7 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <motion.div 
-          animate={{ scale: [1, 1.2, 1], rotate: [0, 180, 360] }}
-          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-          className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full"
-        />
-      </div>
-    );
+    return <AuthScreenSkeleton />;
   }
 
   if (!user) {
