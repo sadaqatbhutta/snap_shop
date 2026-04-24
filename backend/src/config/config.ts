@@ -31,6 +31,7 @@ const ConfigSchema = z.object({
 
   QUEUE_CONCURRENCY: z.coerce.number().default(5),
   QUEUE_MAX_RETRIES: z.coerce.number().default(3),
+  QUEUE_STRICT_MODE: z.coerce.boolean().default(false),
 
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60000),
   RATE_LIMIT_MAX_REQ: z.coerce.number().default(60),

@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { Business } from '../../../shared/types';
@@ -9,6 +9,8 @@ interface BusinessContextValue {
   businessId: string | null;
   loading: boolean;
   refreshBusiness: () => Promise<void>;
+  dataStatus: 'healthy' | 'degraded';
+  lastError: string | null;
 }
 
 const BusinessContext = createContext<BusinessContextValue>({
@@ -16,9 +18,12 @@ const BusinessContext = createContext<BusinessContextValue>({
   businessId: null,
   loading: true,
   refreshBusiness: async () => {},
+  dataStatus: 'healthy',
+  lastError: null,
 });
 
-const FIRESTORE_BOOTSTRAP_TIMEOUT_MS = 8000;
+const FIRESTORE_BOOTSTRAP_TIMEOUT_MS = 5000;
+const RETRY_WINDOW_MS = 15000;
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
@@ -38,88 +43,125 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: str
 export function BusinessProvider({ children }: { children: React.ReactNode }) {
   const [business, setBusiness] = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dataStatus, setDataStatus] = useState<'healthy' | 'degraded'>('healthy');
+  const [lastError, setLastError] = useState<string | null>(null);
+  const hasBootstrappedRef = useRef(false);
+  const inFlightLoadRef = useRef<Promise<void> | null>(null);
+  const lastLoadAttemptAtRef = useRef(0);
 
-  const loadBusiness = useCallback(async () => {
-    setLoading(true);
+  const buildFallbackBusiness = useCallback((user: NonNullable<typeof auth.currentUser>): Business => ({
+    id: user.uid,
+    name: user.displayName?.trim() || 'My Business',
+    description: '',
+    aiContext: 'We are a business that helps customers with their needs.',
+    faqs: [],
+    ownerEmail: user.email ?? '',
+    createdAt: new Date().toISOString(),
+    confidenceThreshold: 0.7,
+    onboarding: {
+      faqsAdded: false,
+      aiContextFilled: false,
+      teamInvited: false,
+      channelReviewed: false,
+      firstTestChat: false,
+    },
+    aiMacros: [],
+  }), []);
+
+  const loadBusiness = useCallback(async (opts?: { forceLoading?: boolean }) => {
+    if (inFlightLoadRef.current) {
+      return inFlightLoadRef.current;
+    }
+
+    const now = Date.now();
+    if (hasBootstrappedRef.current && now - lastLoadAttemptAtRef.current < RETRY_WINDOW_MS && business) {
+      return;
+    }
+
+    const shouldBlockUi = opts?.forceLoading ?? !hasBootstrappedRef.current;
+    if (shouldBlockUi) {
+      setLoading(true);
+    }
     const user = auth.currentUser;
-    if (!user) { setLoading(false); return; }
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
-    try {
+    const run = (async () => {
+      try {
+        lastLoadAttemptAtRef.current = Date.now();
       const bizRef = doc(db, 'businesses', user.uid);
       const bizSnap = await withTimeout(getDoc(bizRef), FIRESTORE_BOOTSTRAP_TIMEOUT_MS, 'Business fetch');
 
       if (bizSnap.exists()) {
         setBusiness({ ...(bizSnap.data() as Omit<Business, 'id'>), id: bizSnap.id });
+        setDataStatus('healthy');
+        setLastError(null);
       } else {
-        const newBusiness: Business = {
-          id: user.uid,
-          name: user.displayName?.trim() || 'My Business',
-          description: '',
-          aiContext: 'We are a business that helps customers with their needs.',
-          faqs: [],
-          ownerEmail: user.email ?? '',
-          createdAt: new Date().toISOString(),
-          confidenceThreshold: 0.7,
-          onboarding: {
-            faqsAdded: false,
-            aiContextFilled: false,
-            teamInvited: false,
-            channelReviewed: false,
-            firstTestChat: false,
-          },
-          aiMacros: [],
-        };
+        const newBusiness = buildFallbackBusiness(user);
         try {
           await withTimeout(setDoc(bizRef, newBusiness), FIRESTORE_BOOTSTRAP_TIMEOUT_MS, 'Business create');
           setBusiness(newBusiness);
+          setDataStatus('healthy');
+          setLastError(null);
         } catch (writeErr) {
           console.warn('Could not create business in Firestore:', writeErr);
           setBusiness(newBusiness);
+          setDataStatus('degraded');
+          setLastError(writeErr instanceof Error ? writeErr.message : 'Unable to persist business document.');
         }
       }
-    } catch (err) {
-      console.error('BusinessContext error:', err);
-      const user = auth.currentUser;
-      if (user) {
-        const defaultBusiness: Business = {
-          id: user.uid,
-          name: user.displayName?.trim() || 'My Business',
-          description: '',
-          aiContext: 'We are a business that helps customers with their needs.',
-          faqs: [],
-          ownerEmail: user.email ?? '',
-          createdAt: new Date().toISOString(),
-          confidenceThreshold: 0.7,
-          onboarding: {
-            faqsAdded: false,
-            aiContextFilled: false,
-            teamInvited: false,
-            channelReviewed: false,
-            firstTestChat: false,
-          },
-          aiMacros: [],
-        };
-        setBusiness(defaultBusiness);
+      } catch (err) {
+        console.error('BusinessContext error:', err);
+        const currentUser = auth.currentUser;
+        if (currentUser && !business) {
+          setBusiness(buildFallbackBusiness(currentUser));
+        }
+        setDataStatus('degraded');
+        setLastError(err instanceof Error ? err.message : 'Business data load failed.');
+      } finally {
+        hasBootstrappedRef.current = true;
+        if (shouldBlockUi) {
+          setLoading(false);
+        }
+        inFlightLoadRef.current = null;
       }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    })();
+
+    inFlightLoadRef.current = run;
+    return run;
+  }, [business, buildFallbackBusiness]);
 
   useEffect(() => {
     const unsub = auth.onAuthStateChanged((user) => {
-      if (user) loadBusiness();
-      else { setBusiness(null); setLoading(false); }
+      if (user) {
+        void loadBusiness({ forceLoading: !hasBootstrappedRef.current });
+      } else {
+        hasBootstrappedRef.current = false;
+        inFlightLoadRef.current = null;
+        setBusiness(null);
+        setDataStatus('healthy');
+        setLastError(null);
+        setLoading(false);
+      }
     });
     return unsub;
   }, [loadBusiness]);
 
   const value = useMemo(
-    () => ({ business, businessId: business?.id ?? null, loading, refreshBusiness: loadBusiness }),
-    [business, loading, loadBusiness],
+    () => ({
+      business,
+      businessId: business?.id ?? auth.currentUser?.uid ?? null,
+      loading,
+      refreshBusiness: () => loadBusiness({ forceLoading: false }),
+      dataStatus,
+      lastError,
+    }),
+    [business, loading, loadBusiness, dataStatus, lastError],
   );
 
-  if (loading) {
+  if (loading && !business) {
     return <LayoutSkeleton />;
   }
 

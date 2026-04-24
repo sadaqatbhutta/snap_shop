@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { User, sendEmailVerification } from 'firebase/auth';
-import { onAuthChange, loginWithGoogle, loginWithEmail, registerWithEmail, logout } from '../services/authService';
+import { onAuthChange, loginWithGoogle, loginWithEmail, registerWithEmail, logout, resetPassword } from '../services/authService';
 import { Bot, LogIn, Mail, Lock, ArrowRight, UserPlus, AlertCircle, Eye, EyeOff, CheckCircle2, Sparkles, Users, MessageSquare, User as UserIcon, RefreshCw, Send, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth } from '../firebase';
@@ -42,10 +42,14 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   const [captchaAnswer, setCaptchaAnswer] = useState(0);
   const [captchaInput, setCaptchaInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const hidePasswordTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [showFirstVisitIntro, setShowFirstVisitIntro] = useState(false);
 
   const generateCaptcha = () => {
     const num1 = Math.floor(Math.random() * 10);
@@ -68,12 +72,42 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   }, []);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const seen = localStorage.getItem('snapshop-auth-intro-seen');
+    if (!seen) {
+      setShowFirstVisitIntro(true);
+      localStorage.setItem('snapshop-auth-intro-seen', '1');
+      const timer = setTimeout(() => setShowFirstVisitIntro(false), 2200);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  useEffect(() => {
     let timer: NodeJS.Timeout;
     if (resendCooldown > 0) {
       timer = setInterval(() => setResendCooldown(c => c - 1), 1000);
     }
     return () => clearInterval(timer);
   }, [resendCooldown]);
+
+  useEffect(() => {
+    return () => {
+      if (hidePasswordTimeoutRef.current) {
+        clearTimeout(hidePasswordTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const revealPasswordTemporarily = () => {
+    setShowPassword(true);
+    if (hidePasswordTimeoutRef.current) {
+      clearTimeout(hidePasswordTimeoutRef.current);
+    }
+    hidePasswordTimeoutRef.current = setTimeout(() => {
+      setShowPassword(false);
+      hidePasswordTimeoutRef.current = null;
+    }, 3000);
+  };
 
   const handleRefresh = async () => {
     if (!auth.currentUser) return;
@@ -102,6 +136,7 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setResetSent(false);
     setAuthLoading(true);
     try {
       const normalizedEmail = email.trim();
@@ -117,6 +152,10 @@ export default function AuthGuard({ children }: AuthGuardProps) {
         await registerWithEmail(normalizedEmail, password, displayName);
       }
     } catch (err: any) {
+      if (!isLogin) {
+        // On any signup failure, rotate captcha and require a fresh answer.
+        generateCaptcha();
+      }
       setError(mapAuthError(err.message));
     } finally {
       setAuthLoading(false);
@@ -135,36 +174,101 @@ export default function AuthGuard({ children }: AuthGuardProps) {
     }
   };
 
+  const handleForgotPassword = async () => {
+    setError(null);
+    setResetSent(false);
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) {
+      setError('Enter your email first, then click Forgot Password.');
+      return;
+    }
+    setResetLoading(true);
+    try {
+      await resetPassword(normalizedEmail);
+      setResetSent(true);
+    } catch (err: any) {
+      setError(mapAuthError(err.message));
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
   if (loading) {
     return <AuthScreenSkeleton />;
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen flex bg-white font-sans text-gray-900">
-        <div className="hidden lg:flex lg:w-1/2 bg-indigo-600 p-12 flex-col justify-between relative overflow-hidden">
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full -translate-x-1/2 -translate-y-1/2 blur-3xl" />
+      <motion.div
+        className="min-h-screen flex bg-gradient-to-br from-slate-50 via-white to-indigo-50 font-sans text-gray-900 relative overflow-hidden"
+        initial={{ opacity: 0, scale: 1.01 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.45, ease: 'easeOut' }}
+      >
+        <div className="absolute -top-24 -left-24 w-72 h-72 rounded-full bg-indigo-200/40 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-24 -right-24 w-72 h-72 rounded-full bg-violet-200/40 blur-3xl pointer-events-none" />
+
+        <div className="hidden lg:flex lg:w-1/2 p-12 flex-col justify-between relative overflow-hidden">
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{
+              backgroundImage: "url('/auth-bg.svg')",
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/35 via-indigo-800/25 to-violet-800/35" />
+          <div className="absolute inset-0 opacity-20">
+            <div className="absolute top-0 left-0 w-[34rem] h-[34rem] bg-white rounded-full -translate-x-1/2 -translate-y-1/2 blur-3xl" />
           </div>
           <div className="relative z-10">
             <div className="flex items-center gap-3 text-white mb-12">
-              <div className="p-2 bg-white/20 rounded-xl backdrop-blur-md overflow-hidden">
-                <img src="/favicon.png" className="w-8 h-8 object-cover" alt="Logo" />
+              <div className="p-2.5 bg-white/20 rounded-2xl backdrop-blur-md overflow-hidden">
+                <img src="/favicon.png" className="w-8 h-8 object-cover" alt="SnapShop AI logo" />
               </div>
               <span className="text-2xl font-bold tracking-tight text-white">SnapShop AI</span>
             </div>
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="max-w-md">
-              <h2 className="text-5xl font-bold text-white leading-tight mb-6">Automate your sales with AI intelligence.</h2>
-              <p className="text-indigo-100 text-lg leading-relaxed">Connect with customers, manage segments, and scale with broadcasts.</p>
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="max-w-lg">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/20 text-indigo-50 text-xs font-semibold tracking-wide mb-6 backdrop-blur-md">
+                <Sparkles className="w-3.5 h-3.5" />
+                AI-First Sales Workspace
+              </div>
+              <h2 className="text-5xl font-bold text-white leading-tight mb-6">The modern inbox for AI-powered customer sales.</h2>
+              <p className="text-indigo-100 text-lg leading-relaxed">
+                Reply faster, automate campaigns, and convert more leads with one intelligent dashboard.
+              </p>
+              <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                {[
+                  'Smart reply suggestions',
+                  'Broadcast + segmentation',
+                  'Team inbox collaboration',
+                  'Multi-channel webhooks',
+                ].map(item => (
+                  <div key={item} className="flex items-center gap-2 text-indigo-50/95">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-300 shrink-0" />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
             </motion.div>
           </div>
         </div>
 
-        <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gray-50/50">
-          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="w-full max-w-md space-y-8">
+        <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-8">
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4, delay: 0.1 }}
+            className="w-full max-w-md rounded-3xl border border-white/60 bg-white/90 backdrop-blur-xl shadow-[0_20px_60px_-20px_rgba(79,70,229,0.35)] p-7 sm:p-8 space-y-7"
+          >
             <div className="text-center lg:text-left">
-              <h1 className="text-3xl font-bold tracking-tight text-gray-900 mb-2">{isLogin ? 'Welcome back' : 'Get started today'}</h1>
-              <p className="text-gray-500">{isLogin ? 'Enter your credentials to access your dashboard.' : 'Join thousands of businesses scaling with SnapShop AI.'}</p>
+              <p className="text-xs uppercase tracking-[0.18em] font-semibold text-indigo-500 mb-2">Secure Access</p>
+              <h1 className="text-3xl font-bold tracking-tight text-gray-900 mb-2">
+                {isLogin ? 'Welcome back' : 'Create your AI workspace'}
+              </h1>
+              <p className="text-gray-500">
+                {isLogin
+                  ? 'Sign in to continue your sales automation workflow.'
+                  : 'Join teams using AI to grow customer conversations and revenue.'}
+              </p>
             </div>
 
             <AnimatePresence mode="wait">
@@ -172,6 +276,14 @@ export default function AuthGuard({ children }: AuthGuardProps) {
                 <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="p-4 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3 text-sm text-red-600">
                   <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
                   <p className="font-medium">{error}</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <AnimatePresence mode="wait">
+              {resetSent && (
+                <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="p-4 bg-green-50 border border-green-100 rounded-xl flex items-start gap-3 text-sm text-green-700">
+                  <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
+                  <p className="font-medium">Password reset email sent. Please check your inbox.</p>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -195,13 +307,45 @@ export default function AuthGuard({ children }: AuthGuardProps) {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-gray-700 ml-1">Password</label>
-                <input type={showPassword ? "text" : "password"} required value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none" />
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    className="w-full px-4 pr-12 py-3 bg-white border border-gray-200 rounded-xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={revealPasswordTemporarily}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-600"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
               </div>
               {!isLogin && (
                 <>
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-gray-700 ml-1">Confirm Password</label>
-                    <input type="password" required value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none" />
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        value={confirmPassword}
+                        onChange={e => setConfirmPassword(e.target.value)}
+                        className="w-full px-4 pr-12 py-3 bg-white border border-gray-200 rounded-xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={revealPasswordTemporarily}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-600"
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-gray-700 ml-1">What is {captchaQuestion}?</label>
@@ -209,32 +353,95 @@ export default function AuthGuard({ children }: AuthGuardProps) {
                   </div>
                 </>
               )}
-              <button type="submit" disabled={authLoading} className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold text-base hover:bg-indigo-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+              <motion.button
+                type="submit"
+                disabled={authLoading}
+                className="w-full py-4 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl font-bold text-base hover:from-indigo-700 hover:to-violet-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-indigo-200"
+                whileHover={{ y: -2, scale: 1.01 }}
+                whileTap={{ scale: 0.98 }}
+              >
                 {authLoading ? <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin" /> : (isLogin ? <LogIn className="w-5 h-5" /> : <UserPlus className="w-5 h-5" />)}
                 {isLogin ? 'Sign In' : 'Create Account'}
-              </button>
+              </motion.button>
+              {isLogin && (
+                <motion.button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={resetLoading || authLoading}
+                  className="w-full text-sm font-semibold text-indigo-600 hover:text-indigo-700 disabled:opacity-60"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  {resetLoading ? 'Sending reset email...' : 'Forgot Password?'}
+                </motion.button>
+              )}
             </form>
 
-            <button onClick={handleGoogleLogin} disabled={authLoading} className="w-full flex items-center justify-center gap-3 py-4 border border-gray-200 bg-white text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition-all font-sans">
+            <motion.button
+              onClick={handleGoogleLogin}
+              disabled={authLoading}
+              className="w-full flex items-center justify-center gap-3 py-4 border border-gray-200 bg-white text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition-all font-sans"
+              whileHover={{ y: -1, scale: 1.005 }}
+              whileTap={{ scale: 0.98 }}
+            >
               <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
               Sign in with Google
-            </button>
+            </motion.button>
 
-            <div className="text-center pt-4">
-              <button onClick={() => { setIsLogin(!isLogin); setError(null); }} className="text-sm font-bold text-gray-500 hover:text-indigo-600">
+            <div className="text-center pt-2">
+              <motion.button
+                onClick={() => { setIsLogin(!isLogin); setError(null); }}
+                className="text-sm font-bold text-gray-500 hover:text-indigo-600"
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.98 }}
+              >
                 {isLogin ? <>Don't have an account? <span className="text-indigo-600">Sign up</span></> : <>Already have an account? <span className="text-indigo-600">Sign in</span></>}
-              </button>
+              </motion.button>
             </div>
           </motion.div>
         </div>
-      </div>
+        <AnimatePresence>
+          {showFirstVisitIntro && (
+            <motion.div
+              className="fixed inset-0 z-[100] flex items-center justify-center bg-gradient-to-br from-indigo-700 via-indigo-600 to-violet-600"
+              initial={{ opacity: 1 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.45, ease: 'easeOut' }}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 1.05 }}
+                transition={{ duration: 0.5, ease: 'easeOut' }}
+                className="text-center text-white"
+              >
+                <motion.div
+                  className="mx-auto mb-5 p-4 bg-white/20 rounded-3xl backdrop-blur-md w-fit"
+                  animate={{ rotate: [0, -4, 4, 0] }}
+                  transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+                >
+                  <img src="/favicon.png" className="w-10 h-10 object-cover" alt="SnapShop AI logo" />
+                </motion.div>
+                <h2 className="text-3xl font-black tracking-tight">SnapShop AI</h2>
+                <p className="text-indigo-100 mt-2 text-sm">Preparing your AI sales workspace...</p>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
     );
   }
 
   if (!user.emailVerified) {
     return (
       <div className="min-h-screen flex bg-white font-sans text-gray-900">
-        <div className="hidden lg:flex lg:w-1/2 bg-indigo-600 p-12 flex-col justify-between relative overflow-hidden">
+        <div className="hidden lg:flex lg:w-1/2 p-12 flex-col justify-between relative overflow-hidden">
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: "url('/auth-bg.svg')" }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/35 via-indigo-800/25 to-violet-800/35" />
           <div className="absolute inset-0 opacity-10">
             <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full -translate-x-1/2 -translate-y-1/2 blur-3xl" />
           </div>

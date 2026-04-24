@@ -238,7 +238,7 @@ async function isDuplicate(id: string) {
   }
   
   const key = `dedup:${id}`;
-  const result = await redis.set(key, '1', 'NX', 'EX', 3600);
+  const result = await redis.set(key, '1', 'EX', 3600, 'NX');
   return result === null;
 }
 

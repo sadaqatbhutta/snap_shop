@@ -67,7 +67,7 @@ export default function Segments() {
       custQuery = query(collection(db, `businesses/${businessId}/customers`), where('channel', '==', formData.channel));
     }
     const criteria: Segment['criteria'] = {};
-    if (formData.channel !== 'all') criteria.channel = formData.channel;
+    if (formData.channel !== 'all') criteria.channel = formData.channel as Segment['criteria']['channel'];
     if (formData.tags) {
       criteria.tags = formData.tags.split(',').map(t => t.trim()).filter(Boolean);
       criteria.tagLogic = formData.tagLogic;

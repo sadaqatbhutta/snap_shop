@@ -3,12 +3,34 @@ import { config } from './src/config/config.js';
 import { logger } from './src/utils/logger.js';
 import { fileURLToPath } from 'url';
 import { startWorkers } from './worker.js';
+import { getQueueRuntimeInfo } from './src/queues/queue.js';
 
 async function startServer() {
-  const app = await createApp();
+  const queueRuntime = getQueueRuntimeInfo();
+  const strictQueueMode = config.QUEUE_STRICT_MODE && config.NODE_ENV !== 'development' && config.NODE_ENV !== 'test';
   const inlineWorkersEnabled =
     process.env.INLINE_WORKERS_IN_SERVER === 'true' ||
     (config.NODE_ENV === 'development' && process.env.INLINE_WORKERS_IN_SERVER !== 'false');
+
+  logger.info(
+    {
+      environment: config.NODE_ENV,
+      queueMode: queueRuntime.mode,
+      queueStrictMode: strictQueueMode,
+      redisConnected: queueRuntime.redisConnected,
+      inlineWorkersEnabled,
+      queueHealthy: queueRuntime.healthy,
+    },
+    'Startup readiness summary'
+  );
+
+  if (strictQueueMode && queueRuntime.mode !== 'redis') {
+    throw new Error(
+      `QUEUE_STRICT_MODE is enabled but queue runtime is "${queueRuntime.mode}". Configure REDIS_URL and restart.`
+    );
+  }
+
+  const app = await createApp();
 
   if (inlineWorkersEnabled) {
     startWorkers();

@@ -21,10 +21,10 @@ export async function verifyFirebaseToken(req: Request, res: Response, next: Nex
     const idToken = header.slice(7);
     const decodedToken = await auth.verifyIdToken(idToken);
     (req as AuthenticatedRequest).user = {
+      ...decodedToken,
       uid: decodedToken.uid,
       email: decodedToken.email,
       name: decodedToken.name,
-      ...decodedToken,
     };
     next();
   } catch (err: any) {

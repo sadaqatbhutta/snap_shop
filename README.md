@@ -137,3 +137,16 @@ The widget posts messages to `/api/webchat/message`, which flows into the same A
 - In development without Redis, the in-memory queue fallback is enabled.
 - For production, configure Redis and run the worker process.
 - Settings > Integrations shows health indicators for key channel configuration values.
+
+---
+
+## Deployment Safety Checklist
+
+Use this checklist before pushing to staging/production:
+
+- Set `NODE_ENV` to `staging` or `production`.
+- Configure a working `REDIS_URL` (Redis 6.2+).
+- Set `QUEUE_STRICT_MODE=true` so startup fails fast if Redis is unavailable.
+- Run workers (`npm run worker`) or enable controlled inline workers only when intended.
+- Confirm `GET /api/health` returns `queueRuntime.mode = "redis"` and `status = "ok"`.
+- Verify required secrets are present: `GEMINI_API_KEY`, `WEBHOOK_SECRET`, `META_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, Firebase service credentials.

@@ -5,6 +5,9 @@ import { logger } from '../utils/logger.js';
 
 const isProduction = config.NODE_ENV === 'production';
 const isStaging = process.env.STAGING === 'true' || config.NODE_ENV === 'staging';
+const inlineWorkersConfigured =
+  process.env.INLINE_WORKERS_IN_SERVER === 'true' ||
+  (config.NODE_ENV === 'development' && process.env.INLINE_WORKERS_IN_SERVER !== 'false');
 
 // ─── Redis Connection with Retry & Version Check ─────────────────────────────
 function createRedisConnection(): Redis | null {
@@ -187,9 +190,12 @@ class InMemoryQueue<T> {
 // ─── Queue Factory ────────────────────────────────────────────────────────────
 function createQueue<T>(name: string) {
   if (!connection) {
-    logger.error(
-      { queue: name, service: 'snapshop-backend' },
-      '🚨 CRITICAL: Using in-memory fallback queue. Jobs will NOT be processed! Configure REDIS_URL to enable job processing.'
+    const level = isProduction || isStaging ? 'error' : 'warn';
+    logger[level](
+      { queue: name, service: 'snapshop-backend', inlineWorkersConfigured },
+      isProduction || isStaging
+        ? '🚨 CRITICAL: Redis unavailable in non-dev environment; queue processing is degraded.'
+        : 'Using in-memory fallback queue. Jobs process only when workers are running in this runtime.'
     );
     return new InMemoryQueue<T>(name);
   }
@@ -203,6 +209,17 @@ function createQueue<T>(name: string) {
 export const emrQueue = createQueue<EMRJobData>('emr');
 export const webhookQueue = createQueue<WebhookJobData>('webhook');
 export const broadcastQueue = createQueue<BroadcastJobData>('broadcast');
+
+export function getQueueRuntimeInfo() {
+  const mode = connection ? 'redis' : 'in-memory';
+  return {
+    mode,
+    redisConnected: Boolean(connection),
+    inlineWorkersConfigured,
+    environment: config.NODE_ENV,
+    healthy: mode === 'redis' || (!isProduction && !isStaging),
+  };
+}
 
 // ─── Job Data Types ───────────────────────────────────────────────────────────
 export type EMRJobData = {

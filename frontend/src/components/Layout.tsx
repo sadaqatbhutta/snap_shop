@@ -3,12 +3,13 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   LayoutDashboard, MessageSquare, Users, Settings, LogOut,
-  Bot, TrendingUp, Megaphone, User, ChevronDown, KeyRound
+  Bot, TrendingUp, Megaphone, User, ChevronDown, KeyRound, AlertTriangle, RefreshCw
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { logout } from '../services/authService';
 import { auth } from '../firebase';
 import { scaleIn } from '../lib/animations';
+import { useBusiness } from '../context/BusinessContext';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -18,7 +19,9 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const user = auth.currentUser;
+  const { dataStatus, lastError, refreshBusiness } = useBusiness();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [retryingData, setRetryingData] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const navItems = [
@@ -45,6 +48,15 @@ export default function Layout({ children }: LayoutProps) {
   const handleLogout = async () => {
     await logout();
     setProfileOpen(false);
+  };
+
+  const handleRetryData = async () => {
+    setRetryingData(true);
+    try {
+      await refreshBusiness();
+    } finally {
+      setRetryingData(false);
+    }
   };
 
   const initials = user?.displayName
@@ -123,9 +135,27 @@ export default function Layout({ children }: LayoutProps) {
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto">
         <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-8 sticky top-0 z-10 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-800">
-            {navItems.find(item => item.path === location.pathname)?.label || 'SnapShop'}
-          </h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold text-gray-800">
+              {navItems.find(item => item.path === location.pathname)?.label || 'SnapShop'}
+            </h2>
+            {dataStatus === 'degraded' && (
+              <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 text-xs font-semibold">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Data sync delayed
+                <button
+                  type="button"
+                  onClick={handleRetryData}
+                  disabled={retryingData}
+                  className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-amber-200 hover:bg-amber-100 disabled:opacity-60"
+                  title={lastError || 'Retry data sync'}
+                >
+                  <RefreshCw className={cn('w-3 h-3', retryingData && 'animate-spin')} />
+                  Retry
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Profile Dropdown */}
           <div className="relative" ref={dropdownRef}>

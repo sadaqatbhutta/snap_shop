@@ -18,6 +18,16 @@ import { logout } from '../services/authService';
 import type { AIMacro } from '../../../shared/types';
 
 type Panel = null | 'integrations' | 'security' | 'billing' | 'team';
+type RuntimePayload = {
+  timestamp: string;
+  uptime_s: number;
+  environment: string;
+  queueMode: 'redis' | 'in-memory';
+  queueStrictMode: boolean;
+  redisConnected: boolean;
+  inlineWorkersEnabled: boolean;
+  queueHealthy: boolean;
+};
 
 // ─── Integrations Panel ───────────────────────────────────────────────────────
 function IntegrationsPanel({ businessId, business, onClose }: { businessId: string; business: any; onClose: () => void }) {
@@ -243,6 +253,28 @@ function SecurityPanel({ onClose }: { onClose: () => void }) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  const mapPasswordError = (err: any) => {
+    const code = String(err?.code || '');
+    const rawMessage = String(err?.message || '').toLowerCase();
+
+    if (code === 'auth/wrong-password' || code === 'auth/invalid-credential' || rawMessage.includes('invalid-credential')) {
+      return 'Current password is incorrect.';
+    }
+    if (code === 'auth/weak-password') {
+      return 'New password is too weak. Use at least 6 characters.';
+    }
+    if (code === 'auth/too-many-requests') {
+      return 'Too many attempts. Please wait and try again.';
+    }
+    if (code === 'auth/requires-recent-login') {
+      return 'For security, please sign in again and then change your password.';
+    }
+    if (code === 'auth/network-request-failed' || rawMessage.includes('network')) {
+      return 'Network error. Check your internet connection and try again.';
+    }
+    return 'Failed to update password.';
+  };
+
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
@@ -264,9 +296,7 @@ function SecurityPanel({ onClose }: { onClose: () => void }) {
       setMessage({ type: 'success', text: 'Password updated successfully!' });
       setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
     } catch (err: any) {
-      const msg = err.code === 'auth/wrong-password' ? 'Current password is incorrect.' :
-                  err.code === 'auth/too-many-requests' ? 'Too many attempts. Try again later.' :
-                  'Failed to update password.';
+      const msg = mapPasswordError(err);
       setMessage({ type: 'error', text: msg });
     } finally {
       setSaving(false);
@@ -544,6 +574,9 @@ export default function Settings() {
   const [aiMacros, setAiMacros] = useState<AIMacro[]>([]);
   const [macroLabel, setMacroLabel] = useState('');
   const [macroContent, setMacroContent] = useState('');
+  const [runtimeHealth, setRuntimeHealth] = useState<RuntimePayload | null>(null);
+  const [healthLoading, setHealthLoading] = useState(true);
+  const [healthError, setHealthError] = useState<string | null>(null);
 
   useEffect(() => {
     if (business) {
@@ -555,6 +588,34 @@ export default function Settings() {
       setAiMacros(business.aiMacros ?? []);
     }
   }, [business]);
+
+  useEffect(() => {
+    let alive = true;
+    const readHealth = async () => {
+      try {
+        if (!alive) return;
+        setHealthLoading(true);
+        const resp = await fetch('/api/runtime');
+        if (!resp.ok) throw new Error(`Runtime endpoint failed (${resp.status})`);
+        const data = (await resp.json()) as RuntimePayload;
+        if (!alive) return;
+        setRuntimeHealth(data);
+        setHealthError(null);
+      } catch (err) {
+        if (!alive) return;
+        setHealthError(err instanceof Error ? err.message : 'Unable to read health status.');
+      } finally {
+        if (alive) setHealthLoading(false);
+      }
+    };
+
+    void readHealth();
+    const interval = setInterval(() => void readHealth(), 30000);
+    return () => {
+      alive = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   const handleSave = async () => {
     if (!businessId) return;
@@ -657,6 +718,71 @@ export default function Settings() {
           </code>
           <p className="text-xs text-indigo-500 mt-2">Use this as <code>business_id</code> in webhook payloads.</p>
         </div>
+      </motion.div>
+
+      {/* Runtime Health */}
+      <motion.div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4" variants={staggerItem}>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">Runtime Health</h3>
+            <p className="text-sm text-gray-500">Queue mode and backend health visibility.</p>
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              setHealthLoading(true);
+              try {
+                const resp = await fetch('/api/runtime');
+                if (!resp.ok) throw new Error(`Runtime endpoint failed (${resp.status})`);
+                const data = (await resp.json()) as RuntimePayload;
+                setRuntimeHealth(data);
+                setHealthError(null);
+              } catch (err) {
+                setHealthError(err instanceof Error ? err.message : 'Unable to read health status.');
+              } finally {
+                setHealthLoading(false);
+              }
+            }}
+            className="px-3 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg hover:bg-gray-50"
+          >
+            Refresh
+          </button>
+        </div>
+
+        {healthLoading && <p className="text-sm text-gray-500">Loading runtime health...</p>}
+        {!healthLoading && healthError && (
+          <p className="text-sm text-red-600">Health read failed: {healthError}</p>
+        )}
+        {!healthLoading && !healthError && runtimeHealth && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+            <div className="p-3 rounded-lg border border-gray-100 bg-gray-50">
+              <p className="text-xs text-gray-500">Backend Status</p>
+              <p className={cn('font-semibold', runtimeHealth.queueHealthy ? 'text-green-700' : 'text-amber-700')}>
+                {runtimeHealth.queueHealthy ? 'ok' : 'degraded'}
+              </p>
+            </div>
+            <div className="p-3 rounded-lg border border-gray-100 bg-gray-50">
+              <p className="text-xs text-gray-500">Queue Mode</p>
+              <p className="font-semibold text-gray-900">{runtimeHealth.queueMode}</p>
+            </div>
+            <div className="p-3 rounded-lg border border-gray-100 bg-gray-50">
+              <p className="text-xs text-gray-500">Redis Connected</p>
+              <p className="font-semibold text-gray-900">{runtimeHealth.redisConnected ? 'Yes' : 'No'}</p>
+            </div>
+            <div className="p-3 rounded-lg border border-gray-100 bg-gray-50">
+              <p className="text-xs text-gray-500">Environment</p>
+              <p className="font-semibold text-gray-900">{runtimeHealth.environment}</p>
+            </div>
+            <div className="p-3 rounded-lg border border-gray-100 bg-gray-50">
+              <p className="text-xs text-gray-500">Queue Strict Mode</p>
+              <p className="font-semibold text-gray-900">{runtimeHealth.queueStrictMode ? 'Enabled' : 'Disabled'}</p>
+            </div>
+            <div className="p-3 rounded-lg border border-gray-100 bg-gray-50">
+              <p className="text-xs text-gray-500">Inline Workers</p>
+              <p className="font-semibold text-gray-900">{runtimeHealth.inlineWorkersEnabled ? 'Enabled' : 'Disabled'}</p>
+            </div>
+          </div>
+        )}
       </motion.div>
 
       {/* Quick replies (macros / playbooks) */}

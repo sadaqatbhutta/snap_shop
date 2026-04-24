@@ -8,6 +8,7 @@ import {
   createUserWithEmailAndPassword,
   updateProfile,
   sendEmailVerification,
+  sendPasswordResetEmail,
 } from 'firebase/auth';
 import { auth } from '../firebase';
 
@@ -34,6 +35,10 @@ export async function registerWithEmail(email: string, pass: string, displayName
 
 export async function logout() {
   await signOut(auth);
+}
+
+export async function resetPassword(email: string) {
+  await sendPasswordResetEmail(auth, email.trim());
 }
 
 export function onAuthChange(callback: (user: User | null) => void) {

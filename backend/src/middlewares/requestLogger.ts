@@ -12,7 +12,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
   res.on('finish', () => {
     const responseTimeMs = Date.now() - start;
     const statusCode = res.statusCode;
-    const level = statusCode >= 500 ? 'error' : statusCode >= 400 ? 'warn' : 'info';
+    const level: 'error' | 'warn' | 'info' = statusCode >= 500 ? 'error' : statusCode >= 400 ? 'warn' : 'info';
 
     const entry = {
       timestamp: new Date().toISOString(),
