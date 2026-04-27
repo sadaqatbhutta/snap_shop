@@ -64,10 +64,15 @@ export default function Layout({ children }: LayoutProps) {
     : user?.email?.charAt(0).toUpperCase() || 'U';
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="relative flex h-screen overflow-hidden">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="float-orb absolute -top-20 -left-20 h-72 w-72 rounded-full bg-indigo-300/25 blur-3xl" />
+        <div className="float-orb absolute -bottom-24 right-1/4 h-80 w-80 rounded-full bg-violet-300/20 blur-3xl [animation-delay:1.6s]" />
+        <div className="float-orb absolute top-1/3 -right-24 h-64 w-64 rounded-full bg-fuchsia-300/20 blur-3xl [animation-delay:0.8s]" />
+      </div>
       {/* Sidebar */}
       <motion.aside
-        className="w-64 bg-white border-r border-gray-200 flex flex-col"
+        className="glass-panel glow-border relative z-10 w-64 border-r border-gray-200/70 flex flex-col"
         initial={{ x: -20, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ duration: 0.3, ease: 'easeOut' }}
@@ -84,7 +89,7 @@ export default function Layout({ children }: LayoutProps) {
           </h1>
         </motion.div>
 
-        <nav className="flex-1 px-4 space-y-1">
+        <nav className="flex-1 px-4 space-y-1.5">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
             return (
@@ -97,7 +102,7 @@ export default function Layout({ children }: LayoutProps) {
                 <Link
                   to={item.path}
                   className={cn(
-                    'flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors relative',
+                    'hover-lift flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors relative',
                     isActive
                       ? 'text-indigo-700'
                       : 'text-gray-600 hover:text-gray-900'
@@ -106,7 +111,7 @@ export default function Layout({ children }: LayoutProps) {
                   {isActive && (
                     <motion.div
                       layoutId="active-nav-pill"
-                      className="absolute inset-0 bg-indigo-50 rounded-lg -z-10"
+                      className="absolute inset-0 bg-indigo-50/90 rounded-lg -z-10 pulse-glow"
                       transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
                     />
                   )}
@@ -133,8 +138,8 @@ export default function Layout({ children }: LayoutProps) {
       </motion.aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto">
-        <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-8 sticky top-0 z-10 shadow-sm">
+      <main className="relative z-10 flex-1 overflow-y-auto">
+        <header className="glass-panel h-16 flex items-center justify-between px-8 sticky top-0 z-10 shadow-sm">
           <div className="flex items-center gap-3">
             <h2 className="text-lg font-semibold text-gray-800">
               {navItems.find(item => item.path === location.pathname)?.label || 'SnapShop'}
@@ -147,7 +152,7 @@ export default function Layout({ children }: LayoutProps) {
                   type="button"
                   onClick={handleRetryData}
                   disabled={retryingData}
-                  className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-amber-200 hover:bg-amber-100 disabled:opacity-60"
+                  className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-amber-200 hover:bg-amber-100 disabled:opacity-60 hover-lift"
                   title={lastError || 'Retry data sync'}
                 >
                   <RefreshCw className={cn('w-3 h-3', retryingData && 'animate-spin')} />
@@ -161,7 +166,7 @@ export default function Layout({ children }: LayoutProps) {
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setProfileOpen(!profileOpen)}
-              className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-100 transition-colors"
+              className="hover-lift flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-100/80 transition-colors"
             >
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-semibold text-gray-900 leading-tight">
@@ -189,7 +194,7 @@ export default function Layout({ children }: LayoutProps) {
             <AnimatePresence>
               {profileOpen && (
                 <motion.div
-                  className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden z-50"
+                  className="glass-panel absolute right-0 top-full mt-2 w-64 rounded-xl shadow-lg border border-gray-200 overflow-hidden z-50"
                   initial="initial"
                   animate="animate"
                   exit="exit"
@@ -220,7 +225,7 @@ export default function Layout({ children }: LayoutProps) {
                   <Link
                     to="/settings"
                     onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+                    className="hover-lift flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
                   >
                     <User className="w-4 h-4 text-gray-500" />
                     Profile & Settings
@@ -228,7 +233,7 @@ export default function Layout({ children }: LayoutProps) {
                   <Link
                     to="/settings"
                     onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+                    className="hover-lift flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
                   >
                     <KeyRound className="w-4 h-4 text-gray-500" />
                     Change Password
@@ -238,7 +243,7 @@ export default function Layout({ children }: LayoutProps) {
                 <div className="p-2 border-t border-gray-100">
                   <button
                     onClick={handleLogout}
-                    className="flex items-center gap-3 px-3 py-2.5 text-sm text-red-600 rounded-lg hover:bg-red-50 transition-colors w-full"
+                    className="hover-lift flex items-center gap-3 px-3 py-2.5 text-sm text-red-600 rounded-lg hover:bg-red-50 transition-colors w-full"
                   >
                     <LogOut className="w-4 h-4" />
                     Sign Out

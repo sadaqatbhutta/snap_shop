@@ -22,6 +22,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [convTotal, setConvTotal] = useState(0);
   const [agentTotal, setAgentTotal] = useState(0);
+  const [onboardingSavingKey, setOnboardingSavingKey] = useState<keyof OnboardingProgress | null>(null);
 
   useEffect(() => {
     if (!businessId) return;
@@ -88,20 +89,22 @@ export default function Dashboard() {
   const channelsDone = ob.channelReviewed;
 
   const onboardingItems = [
-    { done: aiKnowledgeDone, label: 'Teach the AI (context + FAQs)', href: '/ai-settings' },
-    { done: channelsDone, label: 'Configure channel webhooks', href: '/settings', manualKey: 'channelReviewed' as const },
-    { done: teamDone, label: 'Invite a teammate', href: '/settings' },
-    { done: chatsDone, label: 'Receive your first customer message', href: '/conversations' },
+    { done: aiKnowledgeDone, label: 'Teach the AI (context + FAQs)', href: '/ai-settings', key: 'aiContextFilled' as const },
+    { done: channelsDone, label: 'Configure channel webhooks', href: '/settings', key: 'channelReviewed' as const },
+    { done: teamDone, label: 'Invite a teammate', href: '/settings', key: 'teamInvited' as const },
+    { done: chatsDone, label: 'Receive your first customer message', href: '/conversations', key: 'firstTestChat' as const },
   ];
 
   const onboardingComplete = onboardingItems.every(i => i.done);
 
-  const markOnboarding = async (key: keyof OnboardingProgress) => {
+  const setOnboardingValue = async (key: keyof OnboardingProgress, value: boolean) => {
     if (!businessId) return;
+    setOnboardingSavingKey(key);
     await updateDoc(doc(db, 'businesses', businessId), {
-      onboarding: { ...ob, [key]: true },
+      onboarding: { ...ob, [key]: value },
     });
     await refreshBusiness();
+    setOnboardingSavingKey(null);
   };
 
   const stats = [
@@ -119,7 +122,7 @@ export default function Dashboard() {
     <div className="space-y-8">
       {!onboardingComplete && (
         <motion.div
-          className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-xl p-6 text-white shadow-lg"
+          className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-xl p-6 text-white shadow-lg glow-border"
           variants={fadeUp}
           initial="initial"
           animate="animate"
@@ -142,15 +145,14 @@ export default function Dashboard() {
                     <Link to={item.href} className={cn('hover:underline font-medium', item.done ? 'text-indigo-100 line-through opacity-80' : '')}>
                       {item.label}
                     </Link>
-                    {!item.done && item.manualKey === 'channelReviewed' && (
-                      <button
-                        type="button"
-                        onClick={() => void markOnboarding('channelReviewed')}
-                        className="ml-auto text-xs font-semibold bg-white/20 hover:bg-white/30 px-2 py-1 rounded-lg shrink-0"
-                      >
-                        Mark done
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      disabled={onboardingSavingKey === item.key}
+                      onClick={() => void setOnboardingValue(item.key, !item.done)}
+                      className="ml-auto text-xs font-semibold bg-white/20 hover:bg-white/30 px-2 py-1 rounded-lg shrink-0 disabled:opacity-60"
+                    >
+                      {onboardingSavingKey === item.key ? 'Saving...' : item.done ? 'Mark not done' : 'Mark done'}
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -168,9 +170,9 @@ export default function Dashboard() {
         {stats.map(stat => (
           <motion.div
             key={stat.label}
-            className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
+            className="glass-panel hover-lift glow-border p-6 rounded-xl border border-gray-200/80 shadow-sm hover:shadow-md transition-shadow"
             variants={staggerItem}
-            whileHover={{ y: -2 }}
+            whileHover={{ y: -4, scale: 1.01 }}
             transition={{ duration: 0.2 }}
           >
             <div className="flex items-center justify-between mb-4">
@@ -188,7 +190,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
           {/* Recent Conversations */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="glass-panel glow-border rounded-xl border border-gray-200/80 shadow-sm overflow-hidden">
             <motion.div
               className="p-6 border-b border-gray-200 flex items-center justify-between"
               variants={fadeUp}
@@ -211,7 +213,7 @@ export default function Dashboard() {
                 <motion.div key={conv.id} variants={staggerItem}>
                   <Link
                     to="/conversations"
-                    className="p-4 hover:bg-gray-50 transition-colors flex items-center justify-between cursor-pointer block"
+                    className="p-4 hover:bg-gray-50/80 transition-colors flex items-center justify-between cursor-pointer block hover-lift"
                   >
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center font-bold text-indigo-700">
@@ -242,7 +244,7 @@ export default function Dashboard() {
           </div>
 
           {/* Recent Broadcasts */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="glass-panel glow-border rounded-xl border border-gray-200/80 shadow-sm overflow-hidden">
             <motion.div
               className="p-6 border-b border-gray-200 flex items-center justify-between"
               variants={fadeUp}
@@ -264,8 +266,9 @@ export default function Dashboard() {
               {broadcasts.map(bc => (
                 <motion.div
                   key={bc.id}
-                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                  className="hover-lift flex items-center justify-between p-4 bg-gray-50/80 rounded-lg"
                   variants={staggerItem}
+                  whileHover={{ scale: 1.01 }}
                 >
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-indigo-100 rounded-lg">
@@ -291,16 +294,16 @@ export default function Dashboard() {
         </div>
 
         <div className="space-y-6">
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+          <div className="glass-panel glow-border p-6 rounded-xl border border-gray-200/80 shadow-sm">
             <h3 className="font-semibold text-gray-800 mb-4">Quick Actions</h3>
             <div className="space-y-3">
-              <Link to="/broadcasts" className="block w-full py-2 px-4 bg-indigo-600 text-white text-center rounded-lg font-medium hover:bg-indigo-700 transition-colors">
+              <Link to="/broadcasts" className="hover-lift block w-full py-2 px-4 bg-indigo-600 text-white text-center rounded-lg font-medium hover:bg-indigo-700 transition-colors">
                 Broadcast Message
               </Link>
-              <Link to="/ai-settings" className="block w-full py-2 px-4 border border-indigo-600 text-indigo-600 text-center rounded-lg font-medium hover:bg-indigo-50 transition-colors">
+              <Link to="/ai-settings" className="hover-lift block w-full py-2 px-4 border border-indigo-600 text-indigo-600 text-center rounded-lg font-medium hover:bg-indigo-50 transition-colors">
                 Add New FAQ
               </Link>
-              <Link to="/crm" className="block w-full py-2 px-4 border border-gray-200 text-gray-600 text-center rounded-lg font-medium hover:bg-gray-50 transition-colors">
+              <Link to="/crm" className="hover-lift block w-full py-2 px-4 border border-gray-200 text-gray-600 text-center rounded-lg font-medium hover:bg-gray-50 transition-colors">
                 View CRM
               </Link>
             </div>

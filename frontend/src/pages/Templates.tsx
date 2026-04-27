@@ -94,13 +94,13 @@ export default function Templates() {
         </div>
         <button
           onClick={() => { setEditingTemplateId(null); setForm({ name: '', content: '', type: 'text' }); setIsModalOpen(true); }}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+          className="hover-lift flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
         >
           <Plus className="w-4 h-4" /> Create Template
         </button>
       </motion.div>
 
-      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-3">
+      <div className="glass-panel glow-border p-4 rounded-xl border border-gray-200/80 shadow-sm flex items-center gap-3">
         <Search className="w-4 h-4 text-gray-400 shrink-0" />
         <input
           type="text"
@@ -120,7 +120,7 @@ export default function Templates() {
         {filtered.map(template => (
           <motion.div
             key={template.id}
-            className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col group hover:border-indigo-300 transition-all"
+            className="glass-panel glow-border hover-lift rounded-xl border border-gray-200/80 shadow-sm overflow-hidden flex flex-col group hover:border-indigo-300 transition-all"
             variants={staggerItem}
             whileHover={{ y: -2 }}
             transition={{ duration: 0.2 }}
@@ -177,7 +177,7 @@ export default function Templates() {
 
         <button
           onClick={() => setIsModalOpen(true)}
-          className="bg-gray-50 rounded-xl border-2 border-dashed border-gray-300 p-8 flex flex-col items-center justify-center gap-3 hover:bg-gray-100 hover:border-indigo-300 transition-all group"
+          className="glass-panel glow-border hover-lift bg-gray-50/80 rounded-xl border-2 border-dashed border-gray-300 p-8 flex flex-col items-center justify-center gap-3 hover:bg-gray-100 hover:border-indigo-300 transition-all group"
         >
           <div className="p-3 bg-white rounded-full shadow-sm group-hover:scale-110 transition-transform">
             <Plus className="w-6 h-6 text-indigo-600" />
@@ -198,7 +198,7 @@ export default function Templates() {
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
             <motion.div
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+              className="glass-panel glow-border bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
               variants={scaleIn}
               initial="initial"
               animate="animate"

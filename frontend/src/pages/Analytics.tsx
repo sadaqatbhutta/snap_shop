@@ -22,6 +22,8 @@ interface Stats {
   escalationRate: number;
 }
 
+const ANALYTICS_LOAD_TIMEOUT_MS = 10000;
+
 function AnimatedNumber({ value }: { value: number }) {
   const motionValue = useMotionValue(0);
   const rounded = useTransform(motionValue, (latest) => Math.round(latest));
@@ -41,21 +43,42 @@ export default function Analytics() {
   const { businessId } = useBusiness();
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [rangeDays, setRangeDays] = useState(12);
 
   useEffect(() => {
-    if (!businessId) return;
+    if (!businessId) {
+      setLoading(false);
+      setStats({
+        convsByDay: Array(rangeDays).fill(0),
+        intentCounts: {},
+        channelCounts: {},
+        totalMessages: 0,
+        escalationRate: 0,
+      });
+      return;
+    }
 
     async function load() {
+      setLoading(true);
+      setLoadError(null);
+      try {
+      const withTimeout = async <T,>(promise: Promise<T>, label: string): Promise<T> => {
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          window.setTimeout(() => reject(new Error(`${label} timed out after ${ANALYTICS_LOAD_TIMEOUT_MS}ms`)), ANALYTICS_LOAD_TIMEOUT_MS);
+        });
+        return Promise.race([promise, timeoutPromise]);
+      };
+
       // 1. Fetch pre-aggregated daily stats (Last 30 days)
-      const statsSnap = await getDocs(
+      const statsSnap = await withTimeout(getDocs(
         query(collection(db, `businesses/${businessId}/stats`), orderBy('__name__', 'desc'), limit(Math.max(rangeDays, 30)))
-      );
+      ), 'Analytics stats fetch');
       
       // 2. Fetch recent conversations (Last 200 - for channel/escalation breakdown)
-      const convSnap = await getDocs(
+      const convSnap = await withTimeout(getDocs(
         query(collection(db, `businesses/${businessId}/conversations`), orderBy('updatedAt', 'desc'), limit(200))
-      );
+      ), 'Analytics conversations fetch');
 
       const statsDocs = statsSnap.docs.map(d => ({ date: d.id.replace('daily_', ''), ...d.data() }));
       const convs = convSnap.docs.map(d => d.data() as Conversation);
@@ -94,14 +117,33 @@ export default function Analytics() {
         totalMessages: aggregatedTotalMessages,
         escalationRate
       });
+      } catch (err) {
+        console.error('Analytics load failed:', err);
+        setLoadError('Could not load analytics data. Please try again.');
+        setStats({
+          convsByDay: Array(rangeDays).fill(0),
+          intentCounts: {},
+          channelCounts: {},
+          totalMessages: 0,
+          escalationRate: 0,
+        });
+      }
       setLoading(false);
     }
 
-    load();
+    void load();
   }, [businessId, rangeDays]);
 
   if (loading) {
     return <AnalyticsSkeleton />;
+  }
+
+  if (loadError) {
+    return (
+      <div className="glass-panel glow-border rounded-xl border border-red-100 bg-red-50/50 p-8 text-center">
+        <p className="text-sm font-medium text-red-700">{loadError}</p>
+      </div>
+    );
   }
 
   const maxConv = Math.max(...(stats?.convsByDay || [1]), 1);
@@ -133,7 +175,7 @@ export default function Analytics() {
         animate="animate"
       >
         <h3 className="text-lg font-semibold text-gray-900">Performance Overview</h3>
-        <div className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600">
+        <div className="glass-panel glow-border flex items-center gap-2 px-4 py-2 bg-white/80 border border-gray-200/80 rounded-lg text-sm font-medium text-gray-600">
           <Calendar className="w-4 h-4" />
           <select
             value={rangeDays}
@@ -163,7 +205,7 @@ export default function Analytics() {
         ].map(s => (
           <motion.div
             key={s.label}
-            className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm"
+            className="glass-panel glow-border hover-lift bg-white/80 p-5 rounded-xl border border-gray-200/80 shadow-sm"
             variants={staggerItem}
             whileHover={{ y: -2 }}
             transition={{ duration: 0.2 }}
@@ -180,7 +222,7 @@ export default function Analytics() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Conversation Volume Bar Chart */}
         <motion.div
-          className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm"
+          className="glass-panel glow-border bg-white/80 p-6 rounded-xl border border-gray-200/80 shadow-sm"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.2 }}
@@ -212,7 +254,7 @@ export default function Analytics() {
 
         {/* Channel Distribution */}
         <motion.div
-          className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm"
+          className="glass-panel glow-border bg-white/80 p-6 rounded-xl border border-gray-200/80 shadow-sm"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.2 }}
@@ -241,7 +283,7 @@ export default function Analytics() {
 
       {/* Intent Analysis */}
       <motion.div
-        className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm"
+        className="glass-panel glow-border bg-white/80 p-6 rounded-xl border border-gray-200/80 shadow-sm"
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.2 }}

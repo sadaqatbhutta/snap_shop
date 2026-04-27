@@ -169,12 +169,12 @@ export default function Segments() {
             <p className="text-gray-500">Group your customers for targeted broadcasts.</p>
           </div>
         </div>
-        <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">
+        <button onClick={openCreate} className="hover-lift flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">
           <Plus className="w-4 h-4" /> Create Segment
         </button>
       </motion.div>
 
-      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-3">
+      <div className="glass-panel glow-border p-4 rounded-xl border border-gray-200/80 shadow-sm flex items-center gap-3">
         <Search className="w-4 h-4 text-gray-400 shrink-0" />
         <input
           type="text"
@@ -185,7 +185,7 @@ export default function Segments() {
         />
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="glass-panel glow-border rounded-xl border border-gray-200/80 shadow-sm overflow-hidden">
         {filtered.length === 0 ? (
           <div className="p-12 text-center">
             <Users className="w-10 h-10 text-gray-300 mx-auto mb-3" />
@@ -212,7 +212,7 @@ export default function Segments() {
               {filtered.map(segment => (
                 <motion.tr
                   key={segment.id}
-                  className="hover:bg-gray-50 transition-colors group"
+                  className="hover:bg-gray-50/80 transition-colors group hover-lift"
                   variants={staggerItem}
                   whileHover={{ backgroundColor: 'rgba(99,102,241,0.04)' }}
                   whileTap={{ scale: 0.995 }}
@@ -270,7 +270,7 @@ export default function Segments() {
 
       <div
         onClick={openCreate}
-        className="bg-gray-50 rounded-xl border-2 border-dashed border-gray-300 p-12 flex flex-col items-center justify-center gap-4 hover:bg-gray-100 hover:border-indigo-300 transition-all group cursor-pointer"
+        className="glass-panel glow-border bg-gray-50/80 rounded-xl border-2 border-dashed border-gray-300 p-12 flex flex-col items-center justify-center gap-4 hover:bg-gray-100 hover:border-indigo-300 transition-all group cursor-pointer hover-lift"
       >
         <div className="p-4 bg-white rounded-full shadow-sm group-hover:scale-110 transition-transform">
           <UserPlus className="w-8 h-8 text-indigo-600" />
@@ -297,7 +297,7 @@ export default function Segments() {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
               transition={{ duration: 0.2 }}
-              className="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden"
+              className="glass-panel glow-border relative w-full max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden"
             >
               <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-indigo-600 text-white">
                 <h2 className="text-xl font-bold flex items-center gap-2">

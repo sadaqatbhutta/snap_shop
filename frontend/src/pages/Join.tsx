@@ -54,11 +54,11 @@ export default function Join() {
     <>
       {status === 'loading' && <JoinSkeleton />}
       {status !== 'loading' && (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+    <div className="min-h-screen flex items-center justify-center p-6">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="max-w-md w-full bg-white p-10 rounded-3xl shadow-xl shadow-indigo-100/50 border border-gray-100 text-center space-y-6"
+        className="max-w-md w-full glass-panel glow-border bg-white/80 p-10 rounded-3xl shadow-xl shadow-indigo-100/50 border border-gray-100 text-center space-y-6"
       >
         <div className="flex justify-center">
           <div className="p-4 bg-indigo-600 rounded-2xl text-white shadow-lg">
@@ -71,7 +71,7 @@ export default function Join() {
             <AlertCircle className="w-10 h-10 text-orange-500 mx-auto" />
             <h1 className="text-2xl font-black text-gray-900">Sign in Required</h1>
             <p className="text-gray-500">You must be signed in to accept an invitation. Please log in then follow the link again.</p>
-            <button onClick={() => navigate('/')} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black hover:bg-indigo-700 transition-all">
+            <button onClick={() => navigate('/')} className="hover-lift w-full py-4 bg-indigo-600 text-white rounded-2xl font-black hover:bg-indigo-700 transition-all">
               Go to Login
             </button>
           </div>
@@ -92,7 +92,7 @@ export default function Join() {
             <AlertCircle className="w-10 h-10 text-red-500 mx-auto" />
             <h1 className="text-2xl font-black text-gray-900">Invalid Invitation</h1>
             <p className="text-red-600 font-medium">{error}</p>
-            <button onClick={() => navigate('/')} className="w-full py-4 border-2 border-gray-100 text-gray-600 rounded-2xl font-bold hover:bg-gray-50 transition-all">
+            <button onClick={() => navigate('/')} className="hover-lift w-full py-4 border-2 border-gray-100 text-gray-600 rounded-2xl font-bold hover:bg-gray-50 transition-all">
               Back to Safety
             </button>
           </div>

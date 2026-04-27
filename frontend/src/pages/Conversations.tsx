@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Search, Filter, Send, User, Bot, Info, AlertTriangle, Loader2, XCircle, Zap, Download, Sparkles,
+  Search, Filter, Send, User, Bot, Info, AlertTriangle, Loader2, XCircle, Zap, Download, Sparkles, ChevronDown
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useBusiness } from '../context/BusinessContext';
@@ -13,6 +13,8 @@ import { Conversation, Message, InternalNote } from '../../../shared/types';
 import { auth } from '../firebase';
 import { slideInRight, fadeIn } from '../lib/animations';
 import { ConversationsSkeleton } from '../components/Skeleton';
+
+const PAGE_LOAD_TIMEOUT_MS = 10000;
 
 function shortWait(iso?: string) {
   if (!iso) return null;
@@ -48,6 +50,7 @@ export default function Conversations() {
   const [priorityFilter, setPriorityFilter] = useState<'all' | 'hot' | 'needs_review'>('all');
   const [nowForUrgent, setNowForUrgent] = useState(Date.now());
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -62,17 +65,40 @@ export default function Conversations() {
 
   // Live conversations list
   useEffect(() => {
-    if (!businessId) return;
+    if (!businessId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setLoadError(null);
+    const timeout = window.setTimeout(() => {
+      setLoadError('Loading conversations is taking too long. Please retry.');
+      setLoading(false);
+    }, PAGE_LOAD_TIMEOUT_MS);
     const q = query(
       collection(db, `businesses/${businessId}/conversations`),
       orderBy('updatedAt', 'desc'),
       limit(50)
     );
-    return onSnapshot(q, snap => {
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as Conversation));
-      setConversations(data);
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+      q,
+      snap => {
+        const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as Conversation));
+        setConversations(data);
+        window.clearTimeout(timeout);
+        setLoading(false);
+      },
+      (err) => {
+        console.error('Conversations listener failed:', err);
+        setLoadError('Could not load conversations. Please refresh and try again.');
+        window.clearTimeout(timeout);
+        setLoading(false);
+      },
+    );
+    return () => {
+      window.clearTimeout(timeout);
+      unsub();
+    };
   }, [businessId]);
 
   // Live messages for selected conversation
@@ -274,10 +300,18 @@ export default function Conversations() {
     return <ConversationsSkeleton />;
   }
 
+  if (loadError) {
+    return (
+      <div className="glass-panel glow-border rounded-xl border border-red-100 bg-red-50/50 p-8 text-center">
+        <p className="text-sm font-medium text-red-700">{loadError}</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex h-[calc(100vh-160px)] bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+    <div className="glass-panel glow-border flex h-[calc(100vh-160px)] rounded-xl border border-gray-200/80 overflow-hidden shadow-sm">
       {/* ─── Conversation List ─── */}
-      <div className="w-80 border-r border-gray-200 flex flex-col bg-gray-50/30">
+      <div className="w-80 border-r border-gray-200/70 flex flex-col bg-gray-50/30">
         <div className="p-4 border-b border-gray-200 space-y-3 bg-white">
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -290,36 +324,43 @@ export default function Conversations() {
             />
           </div>
           <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => {
-                  const order: Array<'all' | 'active' | 'human_escalated' | 'closed'> = ['all', 'active', 'human_escalated', 'closed'];
-                  const idx = order.indexOf(statusFilter);
-                  setStatusFilter(order[(idx + 1) % order.length]);
-                }}
-                className="flex items-center gap-2 text-xs font-medium text-gray-600 hover:text-indigo-600 transition-colors"
-                title="Cycle filter: all, active, urgent, closed"
-              >
-                <Filter className="w-3 h-3" /> Status
-              </button>
+            <div className="flex items-center justify-between gap-2">
+              <div className="relative flex-1">
+                <Filter className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+                  disabled={conversations.length === 0}
+                  title={conversations.length === 0 ? 'Available when conversations exist' : 'Filter by conversation status'}
+                  className="w-full appearance-none rounded-lg border border-gray-200 bg-white pl-7 pr-7 py-1.5 text-xs font-medium text-gray-700 disabled:bg-gray-100 disabled:text-gray-400"
+                >
+                  <option value="all">All statuses</option>
+                  <option value="active">Active</option>
+                  <option value="human_escalated">Urgent</option>
+                  <option value="closed">Closed</option>
+                </select>
+                <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
               <span className="text-xs text-gray-400">
                 {statusFilter === 'all' ? `${conversations.filter(c => c.status !== 'closed').length} active` : `Status: ${statusFilter.replace('_', ' ')}`}
               </span>
             </div>
-            <div className="flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => {
-                  const order = ['all', 'hot', 'needs_review'] as const;
-                  const idx = order.indexOf(priorityFilter);
-                  setPriorityFilter(order[(idx + 1) % order.length]);
-                }}
-                className="flex items-center gap-2 text-xs font-medium text-gray-600 hover:text-amber-600 transition-colors"
-                title="Lead queue: all, hot leads, needs review"
-              >
-                <Zap className="w-3 h-3" /> Queue
-              </button>
+            <div className="flex items-center justify-between gap-2">
+              <div className="relative flex-1">
+                <Zap className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+                <select
+                  value={priorityFilter}
+                  onChange={(e) => setPriorityFilter(e.target.value as typeof priorityFilter)}
+                  disabled={conversations.length === 0}
+                  title={conversations.length === 0 ? 'Available when conversations exist' : 'Filter by lead queue'}
+                  className="w-full appearance-none rounded-lg border border-gray-200 bg-white pl-7 pr-7 py-1.5 text-xs font-medium text-gray-700 disabled:bg-gray-100 disabled:text-gray-400"
+                >
+                  <option value="all">All leads</option>
+                  <option value="hot">Hot only</option>
+                  <option value="needs_review">Needs review</option>
+                </select>
+                <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
               <span className="text-xs text-gray-400">
                 {priorityFilter === 'all' ? 'All leads' : priorityFilter === 'hot' ? 'Hot only' : 'Review queue'}
               </span>
@@ -347,10 +388,10 @@ export default function Conversations() {
                 key={chat.id}
                 onClick={() => setSelectedId(chat.id)}
                 className={cn(
-                  'p-4 cursor-pointer transition-all border-l-4 relative',
+                  'p-4 cursor-pointer transition-all border-l-4 relative hover-lift',
                   selectedId === chat.id ? 'bg-indigo-50 border-indigo-600' : 'border-transparent hover:bg-gray-50'
                 )}
-                whileHover={{ x: 2 }}
+                whileHover={{ x: 4, scale: 1.01 }}
                 whileTap={{ scale: 0.99 }}
               >
                 <div className="flex items-center justify-between mb-1">
@@ -403,14 +444,14 @@ export default function Conversations() {
         {selected ? (
           <motion.div
             key={selectedId}
-            className="flex-1 flex flex-col bg-white"
+            className="flex-1 flex flex-col bg-white/70 backdrop-blur-sm"
             variants={slideInRight}
             initial="initial"
             animate="animate"
             exit="exit"
           >
           {/* Header */}
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-white z-10">
+          <div className="px-6 py-4 border-b border-gray-200/70 flex items-center justify-between bg-white/85 backdrop-blur-sm z-10">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-sm">
                 {selected.customerName?.charAt(0).toUpperCase() || '?'}
@@ -509,7 +550,7 @@ export default function Conversations() {
           </div>
 
           {/* Footer / Reply Area */}
-          <div className="p-4 bg-white border-t border-gray-200 shadow-lg">
+          <div className="p-4 bg-white/90 backdrop-blur-sm border-t border-gray-200/70 shadow-lg">
             {selected.status === 'human_escalated' && (
               <div className="flex items-center gap-2 mb-3 p-3 bg-red-50 rounded-xl text-xs text-red-700 font-semibold border border-red-100 italic">
                 <AlertTriangle className="w-4 h-4" /> Human Control Active: AI responses are restricted for this customer.

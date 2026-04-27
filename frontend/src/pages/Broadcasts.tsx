@@ -15,6 +15,8 @@ import { staggerContainer, staggerItem, fadeUp, scaleIn } from '../lib/animation
 import { TableSkeleton } from '../components/Skeleton';
 import { auth } from '../firebase';
 
+const PAGE_LOAD_TIMEOUT_MS = 10000;
+
 export default function Broadcasts() {
   const { businessId } = useBusiness();
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
@@ -24,26 +26,54 @@ export default function Broadcasts() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', templateId: '', segmentId: '', scheduledAt: '' });
   const [campaignObjective, setCampaignObjective] = useState('');
   const [generatingCampaign, setGeneratingCampaign] = useState(false);
   const [campaignHint, setCampaignHint] = useState('');
 
   useEffect(() => {
-    if (!businessId) return;
+    if (!businessId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setLoadError(null);
+    const timeout = window.setTimeout(() => {
+      setLoadError('Loading is taking too long. Please retry in a moment.');
+      setLoading(false);
+    }, PAGE_LOAD_TIMEOUT_MS);
+
     const unsubs = [
       onSnapshot(query(collection(db, `businesses/${businessId}/broadcasts`), orderBy('createdAt', 'desc')), snap => {
         setBroadcasts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Broadcast)));
+        window.clearTimeout(timeout);
+        setLoading(false);
+      }, (err) => {
+        console.error('Broadcasts listener failed:', err);
+        setLoadError('Could not load broadcasts. Please refresh and try again.');
+        window.clearTimeout(timeout);
         setLoading(false);
       }),
-      onSnapshot(collection(db, `businesses/${businessId}/templates`), snap =>
-        setTemplates(snap.docs.map(d => ({ id: d.id, ...d.data() } as Template)))
+      onSnapshot(
+        collection(db, `businesses/${businessId}/templates`),
+        (snap) => setTemplates(snap.docs.map(d => ({ id: d.id, ...d.data() } as Template))),
+        (err) => {
+          console.error('Templates listener failed:', err);
+        }
       ),
-      onSnapshot(collection(db, `businesses/${businessId}/segments`), snap =>
-        setSegments(snap.docs.map(d => ({ id: d.id, ...d.data() } as Segment)))
+      onSnapshot(
+        collection(db, `businesses/${businessId}/segments`),
+        (snap) => setSegments(snap.docs.map(d => ({ id: d.id, ...d.data() } as Segment))),
+        (err) => {
+          console.error('Segments listener failed:', err);
+        }
       ),
     ];
-    return () => unsubs.forEach(u => u());
+    return () => {
+      window.clearTimeout(timeout);
+      unsubs.forEach(u => u());
+    };
   }, [businessId]);
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -160,6 +190,22 @@ export default function Broadcasts() {
     return <TableSkeleton rows={6} />;
   }
 
+  if (!businessId) {
+    return (
+      <div className="glass-panel glow-border rounded-xl border border-gray-100 p-8 text-center text-sm text-gray-500">
+        Business context is not ready yet. Please refresh this page in a moment.
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="glass-panel glow-border rounded-xl border border-red-100 bg-red-50/50 p-8 text-center">
+        <p className="text-sm font-medium text-red-700">{loadError}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <motion.div
@@ -173,13 +219,13 @@ export default function Broadcasts() {
           <p className="text-gray-500 text-sm">Send bulk messages to your customer segments.</p>
         </div>
         <div className="flex gap-3">
-          <Link to="/segments" className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all">
+          <Link to="/segments" className="hover-lift flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all">
             <Users className="w-4 h-4 text-indigo-500" /> Segments
           </Link>
-          <Link to="/templates" className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all">
+          <Link to="/templates" className="hover-lift flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all">
             <FileText className="w-4 h-4 text-indigo-500" /> Templates
           </Link>
-          <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 px-6 py-2 text-sm font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all">
+          <button onClick={() => setIsModalOpen(true)} className="hover-lift flex items-center gap-2 px-6 py-2 text-sm font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all">
             <Plus className="w-4 h-4" /> New Broadcast
           </button>
         </div>
@@ -191,7 +237,7 @@ export default function Broadcasts() {
           { label: 'Messages Sent', value: broadcasts.filter(b => b.status === 'sent').reduce((a, b) => a + (b.reach || 0), 0).toLocaleString(), icon: CheckCircle2, bg: 'bg-green-50', color: 'text-green-600' },
           { label: 'Scheduled', value: broadcasts.filter(b => b.status === 'scheduled').length, icon: TrendingUp, bg: 'bg-orange-50', color: 'text-orange-600' },
         ].map(s => (
-          <div key={s.label} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm transition-hover hover:shadow-md">
+          <div key={s.label} className="glass-panel hover-lift glow-border p-6 rounded-2xl border border-gray-100 shadow-sm transition-hover hover:shadow-md">
             <div className="flex items-center gap-4">
               <div className={cn('p-3 rounded-xl', s.bg)}>
                 <s.icon className={cn('w-6 h-6', s.color)} />
@@ -205,7 +251,7 @@ export default function Broadcasts() {
         ))}
       </div>
 
-      <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between">
+      <div className="glass-panel glow-border p-4 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between">
         <div className="flex bg-gray-50 p-1 rounded-xl">
           {['all', 'sent', 'scheduled', 'draft'].map(tab => (
             <button
@@ -222,7 +268,7 @@ export default function Broadcasts() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="glass-panel glow-border rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {filtered.length === 0 ? (
           <div className="p-20 text-center opacity-50">
             <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -251,7 +297,7 @@ export default function Broadcasts() {
               {filtered.map(bc => (
                 <motion.tr
                   key={bc.id}
-                  className="group hover:bg-indigo-50/20 transition-all"
+                  className="group hover:bg-indigo-50/20 transition-all hover-lift"
                   variants={staggerItem}
                   whileHover={{ backgroundColor: 'rgba(99,102,241,0.04)' }}
                   whileTap={{ scale: 0.995 }}
@@ -331,7 +377,7 @@ export default function Broadcasts() {
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
             <motion.div
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+              className="glass-panel glow-border rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
               variants={scaleIn}
               initial="initial"
               animate="animate"

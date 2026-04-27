@@ -22,7 +22,7 @@ const BusinessContext = createContext<BusinessContextValue>({
   lastError: null,
 });
 
-const FIRESTORE_BOOTSTRAP_TIMEOUT_MS = 5000;
+const FIRESTORE_BOOTSTRAP_TIMEOUT_MS = 10000;
 const RETRY_WINDOW_MS = 15000;
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
@@ -75,6 +75,10 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
 
     const now = Date.now();
     if (hasBootstrappedRef.current && now - lastLoadAttemptAtRef.current < RETRY_WINDOW_MS && business) {
+      if (dataStatus === 'degraded') {
+        setDataStatus('healthy');
+        setLastError(null);
+      }
       return;
     }
 
@@ -86,6 +90,12 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
     if (!user) {
       setLoading(false);
       return;
+    }
+
+    // Render app shell immediately with optimistic business data, then hydrate from Firestore.
+    if (shouldBlockUi && !business) {
+      setBusiness(buildFallbackBusiness(user));
+      setLoading(false);
     }
 
     const run = (async () => {
@@ -113,13 +123,25 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
         }
       }
       } catch (err) {
-        console.error('BusinessContext error:', err);
+        console.warn('BusinessContext warning:', err);
         const currentUser = auth.currentUser;
         if (currentUser && !business) {
           setBusiness(buildFallbackBusiness(currentUser));
         }
-        setDataStatus('degraded');
-        setLastError(err instanceof Error ? err.message : 'Business data load failed.');
+        const message = err instanceof Error ? err.message : 'Business data load failed.';
+        const isTimeout = message.toLowerCase().includes('timed out');
+
+        // Keep the app usable with optimistic data if Firestore reads are slow/unreliable.
+        if (isTimeout && currentUser) {
+          setDataStatus('healthy');
+          setLastError(null);
+        } else if (business || currentUser) {
+          setDataStatus('degraded');
+          setLastError(message);
+        } else {
+          setDataStatus('degraded');
+          setLastError(message);
+        }
       } finally {
         hasBootstrappedRef.current = true;
         if (shouldBlockUi) {
@@ -131,7 +153,7 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
 
     inFlightLoadRef.current = run;
     return run;
-  }, [business, buildFallbackBusiness]);
+  }, [business, buildFallbackBusiness, dataStatus]);
 
   useEffect(() => {
     const unsub = auth.onAuthStateChanged((user) => {

@@ -1,1 +1,110 @@
 @import "tailwindcss";
+
+:root {
+  --app-bg-1: #f7f8ff;
+  --app-bg-2: #eef2ff;
+  --app-bg-3: #f5f3ff;
+  --app-glow-primary: rgba(99, 102, 241, 0.35);
+  --app-glow-secondary: rgba(168, 85, 247, 0.3);
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(1200px 900px at -10% -20%, rgba(99, 102, 241, 0.22), transparent 60%),
+    radial-gradient(900px 700px at 110% -10%, rgba(168, 85, 247, 0.18), transparent 60%),
+    linear-gradient(115deg, var(--app-bg-1), var(--app-bg-2), var(--app-bg-3));
+  background-size: 120% 120%;
+  animation: appGradientShift 18s ease-in-out infinite;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(99, 102, 241, 0.45) rgba(15, 23, 42, 0.06);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.6), rgba(139, 92, 246, 0.55));
+}
+
+*::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  transition: transform 180ms ease, box-shadow 220ms ease, background-color 180ms ease, border-color 180ms ease, color 180ms ease, opacity 180ms ease;
+}
+
+@keyframes appGradientShift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes floatOrb {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(0, -20px, 0) scale(1.04);
+  }
+}
+
+@keyframes pulseGlow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(99, 102, 241, 0);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(99, 102, 241, 0.22);
+  }
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.glow-border {
+  box-shadow:
+    0 0 0 1px rgba(99, 102, 241, 0.1),
+    0 14px 35px -20px rgba(79, 70, 229, 0.5);
+}
+
+.hover-lift {
+  transform: translateY(0);
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+}
+
+.pulse-glow {
+  animation: pulseGlow 3.2s ease-in-out infinite;
+}
+
+.float-orb {
+  animation: floatOrb 7s ease-in-out infinite;
+}

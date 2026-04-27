@@ -17,10 +17,26 @@ export default defineConfig(({ mode }) => {
       },
     },
     envDir: path.resolve(__dirname, '..'),
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('firebase')) return 'vendor-firebase';
+              if (id.includes('motion') || id.includes('framer-motion')) return 'vendor-motion';
+              if (id.includes('react-router')) return 'vendor-router';
+              if (id.includes('react-dom') || id.includes('/react/')) return 'vendor-react';
+              if (id.includes('lucide-react')) return 'vendor-icons';
+            }
+            return undefined;
+          },
+        },
+      },
+    },
     server: {
       proxy: {
         '/api': {
-          target: 'http://localhost:3000',
+          target: 'http://localhost:3040',
           changeOrigin: true,
           secure: false,
         },

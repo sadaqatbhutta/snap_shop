@@ -16,6 +16,7 @@ import { TableSkeleton } from '../components/Skeleton';
 
 type SortKey = keyof Customer | null;
 type FilterChannel = 'all' | 'whatsapp' | 'instagram' | 'facebook' | 'webchat';
+const PAGE_LOAD_TIMEOUT_MS = 10000;
 
 export default function CRM() {
   const { businessId } = useBusiness();
@@ -32,14 +33,38 @@ export default function CRM() {
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesInput, setNotesInput] = useState('');
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!businessId) return;
-    const q = query(collection(db, `businesses/${businessId}/customers`), orderBy('lastInteractionAt', 'desc'));
-    return onSnapshot(q, snap => {
-      setCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Customer)));
+    if (!businessId) {
       setLoading(false);
-    });
+      return;
+    }
+    setLoading(true);
+    setLoadError(null);
+    const timeout = window.setTimeout(() => {
+      setLoadError('Loading CRM is taking too long. Please retry.');
+      setLoading(false);
+    }, PAGE_LOAD_TIMEOUT_MS);
+    const q = query(collection(db, `businesses/${businessId}/customers`), orderBy('lastInteractionAt', 'desc'));
+    const unsub = onSnapshot(
+      q,
+      snap => {
+        setCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Customer)));
+        window.clearTimeout(timeout);
+        setLoading(false);
+      },
+      (err) => {
+        console.error('CRM listener failed:', err);
+        setLoadError('Could not load CRM data. Please refresh and try again.');
+        window.clearTimeout(timeout);
+        setLoading(false);
+      }
+    );
+    return () => {
+      window.clearTimeout(timeout);
+      unsub();
+    };
   }, [businessId]);
 
   // Close menus on outside click
@@ -115,6 +140,13 @@ export default function CRM() {
   };
 
   if (loading) return <TableSkeleton rows={8} />;
+  if (loadError) {
+    return (
+      <div className="glass-panel glow-border rounded-xl border border-red-100 bg-red-50/50 p-8 text-center">
+        <p className="text-sm font-medium text-red-700">{loadError}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -129,7 +161,7 @@ export default function CRM() {
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input type="text" placeholder="Search customers..." value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+              className="glass-panel w-full pl-10 pr-4 py-2 bg-white/80 border border-gray-200/80 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
           </div>
           {/* Filter dropdown */}
           <div className="relative" onClick={e => e.stopPropagation()}>
@@ -164,7 +196,7 @@ export default function CRM() {
         </div>
       </motion.div>
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="glass-panel glow-border rounded-xl border border-gray-200/80 shadow-sm overflow-hidden">
         {sorted.length === 0 ? (
           <div className="p-12 text-center">
             <User className="w-10 h-10 text-gray-300 mx-auto mb-3" />
@@ -197,7 +229,7 @@ export default function CRM() {
               {sorted.map(customer => (
                 <motion.tr
                   key={customer.id}
-                  className="hover:bg-gray-50 transition-colors group cursor-pointer"
+                  className="hover:bg-gray-50/80 transition-colors group cursor-pointer hover-lift"
                   onClick={() => { setSelectedCustomer(customer); setNotesInput(customer.notes || ''); setEditingNotes(false); }}
                   variants={staggerItem}
                   whileHover={{ backgroundColor: 'rgba(99,102,241,0.04)' }}
@@ -290,7 +322,7 @@ export default function CRM() {
         {selectedCustomer && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedCustomer(null)}>
             <motion.div
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
+              className="glass-panel glow-border bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
               onClick={e => e.stopPropagation()}
               variants={scaleIn}
               initial="initial"

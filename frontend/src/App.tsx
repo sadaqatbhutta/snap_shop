@@ -1,20 +1,21 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import Layout from './components/Layout';
-import Dashboard from './pages/Dashboard';
-import Conversations from './pages/Conversations';
-import Broadcasts from './pages/Broadcasts';
-import Templates from './pages/Templates';
-import Segments from './pages/Segments';
-import AISettings from './pages/AISettings';
-import CRM from './pages/CRM';
-import Analytics from './pages/Analytics';
-import Settings from './pages/Settings';
-import Join from './pages/Join';
 import AuthGuard from './components/AuthGuard';
 import { BusinessProvider } from './context/BusinessContext';
 import { pageTransition } from './lib/animations';
+
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Conversations = lazy(() => import('./pages/Conversations'));
+const Broadcasts = lazy(() => import('./pages/Broadcasts'));
+const Templates = lazy(() => import('./pages/Templates'));
+const Segments = lazy(() => import('./pages/Segments'));
+const AISettings = lazy(() => import('./pages/AISettings'));
+const CRM = lazy(() => import('./pages/CRM'));
+const Analytics = lazy(() => import('./pages/Analytics'));
+const Settings = lazy(() => import('./pages/Settings'));
+const Join = lazy(() => import('./pages/Join'));
 
 function AnimatedRoutes() {
   const location = useLocation();
@@ -77,13 +78,23 @@ function AnimatedRoutes() {
   );
 }
 
+function RouteLoadingFallback() {
+  return (
+    <div className="w-full rounded-xl border border-gray-200 bg-white/70 p-6 text-sm text-gray-500">
+      Loading page...
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <Router>
       <AuthGuard>
         <BusinessProvider>
           <Layout>
-            <AnimatedRoutes />
+            <Suspense fallback={<RouteLoadingFallback />}>
+              <AnimatedRoutes />
+            </Suspense>
           </Layout>
         </BusinessProvider>
       </AuthGuard>

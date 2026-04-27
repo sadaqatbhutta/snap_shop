@@ -56,7 +56,7 @@ export default function AISettings() {
       initial="initial"
       animate="animate"
     >
-      <motion.div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm space-y-6" variants={staggerItem}>
+      <motion.div className="glass-panel glow-border p-8 rounded-xl border border-gray-200/80 shadow-sm space-y-6" variants={staggerItem}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-indigo-50 rounded-lg">
@@ -70,7 +70,7 @@ export default function AISettings() {
           <motion.button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-60"
+            className="hover-lift flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-60"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.97 }}
             transition={{ duration: 0.15 }}
@@ -96,7 +96,7 @@ export default function AISettings() {
         </div>
       </motion.div>
 
-      <motion.div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm space-y-6" variants={staggerItem}>
+      <motion.div className="glass-panel glow-border p-8 rounded-xl border border-gray-200/80 shadow-sm space-y-6" variants={staggerItem}>
         <div className="flex items-center gap-3">
           <div className="p-2 bg-indigo-50 rounded-lg">
             <Plus className="w-6 h-6 text-indigo-600" />
@@ -140,7 +140,7 @@ export default function AISettings() {
       </motion.div>
 
       <motion.div className="grid grid-cols-1 md:grid-cols-2 gap-6" variants={staggerItem}>
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+        <div className="glass-panel glow-border p-6 rounded-xl border border-gray-200/80 shadow-sm hover-lift">
           <div className="flex items-center gap-3 mb-4">
             <ShieldCheck className="w-5 h-5 text-green-600" />
             <h4 className="font-semibold text-gray-900">AI Guardrails</h4>
@@ -162,7 +162,7 @@ export default function AISettings() {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+        <div className="glass-panel glow-border p-6 rounded-xl border border-gray-200/80 shadow-sm hover-lift">
           <div className="flex items-center gap-3 mb-4">
             <Zap className="w-5 h-5 text-yellow-600" />
             <h4 className="font-semibold text-gray-900">Webhook Endpoint</h4>

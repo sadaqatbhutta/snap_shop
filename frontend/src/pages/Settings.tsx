@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -13,9 +13,10 @@ import { db, auth } from '../firebase';
 import { collection, onSnapshot, query, orderBy, doc, updateDoc } from 'firebase/firestore';
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { staggerContainer, staggerItem, fadeUp, scaleIn } from '../lib/animations';
-import WebchatWidget from '../components/WebchatWidget';
 import { logout } from '../services/authService';
 import type { AIMacro } from '../../../shared/types';
+
+const WebchatWidget = lazy(() => import('../components/WebchatWidget'));
 
 type Panel = null | 'integrations' | 'security' | 'billing' | 'team';
 type RuntimePayload = {
@@ -29,11 +30,22 @@ type RuntimePayload = {
   queueHealthy: boolean;
 };
 
+function getApiBaseUrl() {
+  const fromEnv = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
+  if (fromEnv && fromEnv.trim()) {
+    return fromEnv.replace(/\/$/, '');
+  }
+  if (window.location.hostname === 'localhost') {
+    return 'http://localhost:3040';
+  }
+  return window.location.origin;
+}
+
 // ─── Integrations Panel ───────────────────────────────────────────────────────
 function IntegrationsPanel({ businessId, business, onClose }: { businessId: string; business: any; onClose: () => void }) {
   const [copied, setCopied] = useState<string | null>(null);
 
-  const baseUrl = window.location.origin;
+  const baseUrl = getApiBaseUrl();
 
   const channels = [
     {
@@ -109,7 +121,7 @@ function IntegrationsPanel({ businessId, business, onClose }: { businessId: stri
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="glass-panel glow-border bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-indigo-600 text-white">
           <div className="flex items-center gap-3">
@@ -119,7 +131,7 @@ function IntegrationsPanel({ businessId, business, onClose }: { businessId: stri
               <p className="text-indigo-200 text-sm">Connect your messaging channels via webhooks</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+          <button aria-label="Close integrations panel" onClick={onClose} className="p-2 hover:bg-white/20 rounded-full transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -133,13 +145,14 @@ function IntegrationsPanel({ businessId, business, onClose }: { businessId: stri
                 {businessId}
               </code>
               <button
+                aria-label="Copy business ID"
                 onClick={() => copy(businessId, 'bizid')}
                 className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors shrink-0"
               >
                 {copied === 'bizid' ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4 text-gray-500" />}
               </button>
             </div>
-            <p className="text-xs text-gray-400 mt-2">Send this as <code className="bg-gray-100 px-1 rounded">business_id</code> in every webhook payload.</p>
+            <p className="text-xs text-gray-600 mt-2">Send this as <code className="bg-gray-100 px-1 rounded">business_id</code> in every webhook payload.</p>
           </div>
 
           {/* Webhook Payload Example */}
@@ -147,6 +160,7 @@ function IntegrationsPanel({ businessId, business, onClose }: { businessId: stri
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Example Payload</p>
               <button
+                aria-label="Copy webhook payload example"
                 onClick={() => copy(`{\n  "business_id": "${businessId}",\n  "user_id": "+923001234567",\n  "message": "Hello, what is the price?",\n  "type": "text",\n  "name": "Customer Name"\n}`, 'payload')}
                 className="flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors"
               >
@@ -193,6 +207,7 @@ function IntegrationsPanel({ businessId, business, onClose }: { businessId: stri
                     <code className="text-xs text-gray-700 truncate">{ch.webhook}</code>
                   </div>
                   <button
+                    aria-label={`Copy ${ch.name} webhook URL`}
                     onClick={() => copy(ch.webhook, ch.id)}
                     className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors shrink-0 shadow-sm"
                   >
@@ -221,6 +236,7 @@ function IntegrationsPanel({ businessId, business, onClose }: { businessId: stri
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Website Embed Snippet</p>
               <button
+                aria-label="Copy webchat embed snippet"
                 onClick={() => copy(embedSnippet, 'webchat-embed')}
                 className="flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors"
               >
@@ -231,7 +247,9 @@ function IntegrationsPanel({ businessId, business, onClose }: { businessId: stri
             <pre className="text-xs text-green-400 leading-relaxed overflow-x-auto">{embedSnippet}</pre>
           </div>
 
-          <WebchatWidget businessId={businessId} apiBase={baseUrl} />
+          <Suspense fallback={<p className="text-xs text-gray-500">Loading webchat preview...</p>}>
+            <WebchatWidget businessId={businessId} apiBase={baseUrl} />
+          </Suspense>
         </div>
 
         <div className="p-5 border-t border-gray-100 bg-gray-50/50 flex justify-end">
@@ -306,7 +324,7 @@ function SecurityPanel({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <motion.div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+        className="glass-panel glow-border bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
         variants={scaleIn}
         initial="initial"
         animate="animate"
@@ -317,7 +335,7 @@ function SecurityPanel({ onClose }: { onClose: () => void }) {
             <Lock className="w-6 h-6" />
             <h2 className="text-xl font-bold">Security</h2>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-full"><X className="w-5 h-5" /></button>
+          <button aria-label="Close security panel" onClick={onClose} className="p-2 hover:bg-white/20 rounded-full"><X className="w-5 h-5" /></button>
         </div>
 
         <form onSubmit={handleChangePassword} className="p-6 space-y-5">
@@ -347,21 +365,22 @@ function SecurityPanel({ onClose }: { onClose: () => void }) {
           </AnimatePresence>
 
           {[
-            { label: 'Current Password', value: currentPassword, onChange: setCurrentPassword },
-            { label: 'New Password', value: newPassword, onChange: setNewPassword },
-            { label: 'Confirm New Password', value: confirmPassword, onChange: setConfirmPassword },
+            { id: 'current-password', label: 'Current Password', value: currentPassword, onChange: setCurrentPassword },
+            { id: 'new-password', label: 'New Password', value: newPassword, onChange: setNewPassword },
+            { id: 'confirm-password', label: 'Confirm New Password', value: confirmPassword, onChange: setConfirmPassword },
           ].map(field => (
             <div key={field.label} className="space-y-1">
-              <label className="text-sm font-semibold text-gray-700">{field.label}</label>
+              <label htmlFor={field.id} className="text-sm font-semibold text-gray-700">{field.label}</label>
               <div className="relative">
                 <input
+                  id={field.id}
                   type={showPasswords ? 'text' : 'password'}
                   required
                   value={field.value}
                   onChange={e => field.onChange(e.target.value)}
                   className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
                 />
-                <button type="button" onClick={() => setShowPasswords(!showPasswords)}
+                <button type="button" aria-label={showPasswords ? 'Hide passwords' : 'Show passwords'} onClick={() => setShowPasswords(!showPasswords)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   {showPasswords ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -392,13 +411,13 @@ function SecurityPanel({ onClose }: { onClose: () => void }) {
 function BillingPanel({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div className="glass-panel glow-border bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
         <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-indigo-600 text-white">
           <div className="flex items-center gap-3">
             <CreditCard className="w-6 h-6" />
             <h2 className="text-xl font-bold">Billing</h2>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-full"><X className="w-5 h-5" /></button>
+          <button aria-label="Close billing panel" onClick={onClose} className="p-2 hover:bg-white/20 rounded-full"><X className="w-5 h-5" /></button>
         </div>
         <div className="p-6 space-y-6">
           <div className="p-5 bg-indigo-600 rounded-2xl text-white">
@@ -485,7 +504,7 @@ function TeamPanel({ businessId, onClose }: { businessId: string; onClose: () =>
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col border border-gray-100">
+      <div className="glass-panel glow-border bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col border border-gray-100">
         <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-indigo-600 text-white">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md"><Users className="w-8 h-8" /></div>
@@ -494,15 +513,17 @@ function TeamPanel({ businessId, onClose }: { businessId: string; onClose: () =>
               <p className="text-indigo-100 text-sm font-medium">Manage agents and administrators</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-full transition-all group"><X className="w-6 h-6 group-rotate-90 transition-transform" /></button>
+          <button aria-label="Close team panel" onClick={onClose} className="p-2 hover:bg-white/20 rounded-full transition-all group"><X className="w-6 h-6 group-rotate-90 transition-transform" /></button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-8 space-y-10">
           <section className="space-y-6">
             <h3 className="text-lg font-black text-gray-900 flex items-center gap-2 px-1"><UserPlus className="w-5 h-5 text-indigo-600" /> Invite Teammate</h3>
             <form onSubmit={handleInvite} className="flex flex-col md:flex-row gap-4 p-6 bg-gray-50 rounded-3xl border border-gray-100 shadow-sm transition-all hover:bg-white hover:shadow-md">
-              <input required type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="colleague@company.com" className="flex-1 px-5 py-3 bg-white border border-gray-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-medium text-sm" />
-              <select value={role} onChange={e => setRole(e.target.value as any)} className="w-full md:w-32 px-4 py-3 bg-white border border-gray-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 outline-none font-bold text-sm">
+              <label htmlFor="invite-email" className="sr-only">Invite teammate email</label>
+              <input id="invite-email" required type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="colleague@company.com" className="flex-1 px-5 py-3 bg-white border border-gray-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-medium text-sm" />
+              <label htmlFor="invite-role" className="sr-only">Invite teammate role</label>
+              <select id="invite-role" value={role} onChange={e => setRole(e.target.value as any)} className="w-full md:w-32 px-4 py-3 bg-white border border-gray-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 outline-none font-bold text-sm">
                 <option value="agent">Agent</option>
                 <option value="admin">Admin</option>
               </select>
@@ -577,6 +598,7 @@ export default function Settings() {
   const [runtimeHealth, setRuntimeHealth] = useState<RuntimePayload | null>(null);
   const [healthLoading, setHealthLoading] = useState(true);
   const [healthError, setHealthError] = useState<string | null>(null);
+  const healthBootstrappedRef = useRef(false);
 
   useEffect(() => {
     if (business) {
@@ -589,33 +611,47 @@ export default function Settings() {
     }
   }, [business]);
 
+  const readHealth = useCallback(async () => {
+    const apiBase = getApiBaseUrl();
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 3000);
+    try {
+      setHealthLoading(true);
+      const resp = await fetch(`${apiBase}/api/runtime`, { signal: controller.signal });
+      if (!resp.ok) throw new Error(`Runtime endpoint failed (${resp.status})`);
+      const data = (await resp.json()) as RuntimePayload;
+      setRuntimeHealth(data);
+      setHealthError(null);
+      healthBootstrappedRef.current = true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unable to read health status.';
+      setHealthError(message);
+      // Keep current UI responsive when runtime endpoint is slow/unavailable.
+      if (!healthBootstrappedRef.current) {
+        setRuntimeHealth(null);
+      }
+    } finally {
+      window.clearTimeout(timeout);
+      setHealthLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     let alive = true;
-    const readHealth = async () => {
-      try {
-        if (!alive) return;
-        setHealthLoading(true);
-        const resp = await fetch('/api/runtime');
-        if (!resp.ok) throw new Error(`Runtime endpoint failed (${resp.status})`);
-        const data = (await resp.json()) as RuntimePayload;
-        if (!alive) return;
-        setRuntimeHealth(data);
-        setHealthError(null);
-      } catch (err) {
-        if (!alive) return;
-        setHealthError(err instanceof Error ? err.message : 'Unable to read health status.');
-      } finally {
-        if (alive) setHealthLoading(false);
+    void (async () => {
+      if (!alive) return;
+      await readHealth();
+    })();
+    const interval = setInterval(() => {
+      if (alive) {
+        void readHealth();
       }
-    };
-
-    void readHealth();
-    const interval = setInterval(() => void readHealth(), 30000);
+    }, 30000);
     return () => {
       alive = false;
       clearInterval(interval);
     };
-  }, []);
+  }, [readHealth]);
 
   const handleSave = async () => {
     if (!businessId) return;
@@ -676,7 +712,7 @@ export default function Settings() {
       animate="animate"
     >
       {/* General Settings */}
-      <motion.div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm space-y-6" variants={staggerItem}>
+      <motion.div className="glass-panel glow-border bg-white/80 p-8 rounded-xl border border-gray-200/80 shadow-sm space-y-6" variants={staggerItem}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-indigo-50 rounded-lg"><SettingsIcon className="w-6 h-6 text-indigo-600" /></div>
@@ -700,13 +736,13 @@ export default function Settings() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Business Name</label>
-            <input type="text" value={businessName} onChange={e => setBusinessName(e.target.value)}
+            <label htmlFor="business-name" className="text-sm font-medium text-gray-700">Business Name</label>
+            <input id="business-name" type="text" value={businessName} onChange={e => setBusinessName(e.target.value)}
               className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Business Email</label>
-            <input type="email" value={businessEmail} onChange={e => setBusinessEmail(e.target.value)}
+            <label htmlFor="business-email" className="text-sm font-medium text-gray-700">Business Email</label>
+            <input id="business-email" type="email" value={businessEmail} onChange={e => setBusinessEmail(e.target.value)}
               className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
           </div>
         </div>
@@ -716,12 +752,12 @@ export default function Settings() {
           <code className="text-xs text-indigo-900 bg-white px-3 py-1.5 rounded border border-indigo-200 block break-all">
             {businessId || 'Loading...'}
           </code>
-          <p className="text-xs text-indigo-500 mt-2">Use this as <code>business_id</code> in webhook payloads.</p>
+          <p className="text-xs text-indigo-700 mt-2">Use this as <code>business_id</code> in webhook payloads.</p>
         </div>
       </motion.div>
 
       {/* Runtime Health */}
-      <motion.div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4" variants={staggerItem}>
+      <motion.div className="glass-panel glow-border bg-white/80 p-6 rounded-xl border border-gray-200/80 shadow-sm space-y-4" variants={staggerItem}>
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-base font-semibold text-gray-900">Runtime Health</h3>
@@ -729,20 +765,7 @@ export default function Settings() {
           </div>
           <button
             type="button"
-            onClick={async () => {
-              setHealthLoading(true);
-              try {
-                const resp = await fetch('/api/runtime');
-                if (!resp.ok) throw new Error(`Runtime endpoint failed (${resp.status})`);
-                const data = (await resp.json()) as RuntimePayload;
-                setRuntimeHealth(data);
-                setHealthError(null);
-              } catch (err) {
-                setHealthError(err instanceof Error ? err.message : 'Unable to read health status.');
-              } finally {
-                setHealthLoading(false);
-              }
-            }}
+            onClick={() => void readHealth()}
             className="px-3 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg hover:bg-gray-50"
           >
             Refresh
@@ -786,7 +809,7 @@ export default function Settings() {
       </motion.div>
 
       {/* Quick replies (macros / playbooks) */}
-      <motion.div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm space-y-6" variants={staggerItem}>
+      <motion.div className="glass-panel glow-border bg-white/80 p-8 rounded-xl border border-gray-200/80 shadow-sm space-y-6" variants={staggerItem}>
         <div className="flex items-center gap-3">
           <div className="p-2 bg-emerald-50 rounded-lg"><MessageSquare className="w-6 h-6 text-emerald-600" /></div>
           <div>
@@ -811,7 +834,9 @@ export default function Settings() {
             </div>
           ))}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+            <label htmlFor="macro-label" className="sr-only">Macro label</label>
             <input
+              id="macro-label"
               type="text"
               placeholder="Label (e.g. Shipping policy)"
               value={macroLabel}
@@ -826,12 +851,14 @@ export default function Settings() {
                 setMacroLabel('');
                 setMacroContent('');
               }}
-              className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700"
+              className="px-4 py-2 bg-emerald-700 text-white rounded-lg text-sm font-semibold hover:bg-emerald-800"
             >
               Add macro
             </button>
           </div>
+          <label htmlFor="macro-content" className="sr-only">Macro content</label>
           <textarea
+            id="macro-content"
             rows={3}
             placeholder="Message text to insert…"
             value={macroContent}
@@ -842,7 +869,7 @@ export default function Settings() {
       </motion.div>
 
       {/* Email Notifications */}
-      <motion.div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm space-y-6" variants={staggerItem}>
+      <motion.div className="glass-panel glow-border bg-white/80 p-8 rounded-xl border border-gray-200/80 shadow-sm space-y-6" variants={staggerItem}>
         <div className="flex items-center gap-3">
           <div className="p-2 bg-indigo-50 rounded-lg"><Mail className="w-6 h-6 text-indigo-600" /></div>
           <div>
@@ -865,6 +892,7 @@ export default function Settings() {
                 </div>
               </div>
               <motion.button
+                aria-label={`Toggle ${item.title}`}
                 onClick={() => toggle(item.key)}
                 className={cn('w-12 h-6 rounded-full transition-colors relative', notifications[item.key] ? 'bg-indigo-600' : 'bg-gray-200')}
                 whileTap={{ scale: 0.95 }}
@@ -876,8 +904,8 @@ export default function Settings() {
           <div className="pt-4 border-t border-gray-100 flex items-center gap-4">
             <div className="p-2 bg-gray-50 rounded-lg"><Clock className="w-5 h-5 text-gray-600" /></div>
             <div className="flex-1">
-              <label className="text-sm font-semibold text-gray-900 block mb-1">Delivery Frequency</label>
-              <select value={notifications.frequency} onChange={e => setNotifications(prev => ({ ...prev, frequency: e.target.value }))}
+              <label htmlFor="delivery-frequency" className="text-sm font-semibold text-gray-900 block mb-1">Delivery Frequency</label>
+              <select id="delivery-frequency" value={notifications.frequency} onChange={e => setNotifications(prev => ({ ...prev, frequency: e.target.value }))}
                 className="w-full max-w-xs px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
                 <option value="instant">Instant (Real-time)</option>
                 <option value="daily">Daily Digest</option>
@@ -892,7 +920,7 @@ export default function Settings() {
       <motion.div className="space-y-4" variants={staggerItem}>
         {sections.map(section => (
           <button key={section.label} onClick={() => setActivePanel(section.panel)}
-            className="w-full bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between hover:bg-gray-50 hover:border-indigo-200 transition-all group">
+            className="hover-lift w-full glass-panel glow-border bg-white/80 p-6 rounded-xl border border-gray-200/80 shadow-sm flex items-center justify-between hover:bg-gray-50 hover:border-indigo-200 transition-all group">
             <div className="flex items-center gap-4 text-left">
               <div className="p-2 bg-gray-100 rounded-lg group-hover:bg-indigo-50 transition-colors">
                 <section.icon className="w-5 h-5 text-gray-600 group-hover:text-indigo-600 transition-colors" />
@@ -956,7 +984,7 @@ export default function Settings() {
         {deleteModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
             <motion.div
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+              className="glass-panel glow-border bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
               variants={scaleIn}
               initial="initial"
               animate="animate"
