@@ -11,10 +11,10 @@ import {
 } from 'firebase/firestore';
 import { Conversation, Message, InternalNote } from '../../../shared/types';
 import { auth } from '../firebase';
+import { getApiUrl } from '../lib/apiBase';
 import { slideInRight, fadeIn } from '../lib/animations';
 import { ConversationsSkeleton } from '../components/Skeleton';
-
-const PAGE_LOAD_TIMEOUT_MS = 10000;
+import { PAGE_LOAD_TIMEOUT_MS } from '../lib/constants';
 
 function shortWait(iso?: string) {
   if (!iso) return null;
@@ -71,33 +71,60 @@ export default function Conversations() {
     }
     setLoading(true);
     setLoadError(null);
+    let cancelled = false;
     const timeout = window.setTimeout(() => {
-      setLoadError('Loading conversations is taking too long. Please retry.');
-      setLoading(false);
+      if (!cancelled) {
+        setLoadError('Loading conversations is taking too long. Please retry.');
+        setLoading(false);
+      }
     }, PAGE_LOAD_TIMEOUT_MS);
-    const q = query(
+
+    const conversationsQuery = query(
       collection(db, `businesses/${businessId}/conversations`),
       orderBy('updatedAt', 'desc'),
-      limit(50)
+      limit(50),
     );
-    const unsub = onSnapshot(
-      q,
-      snap => {
-        const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as Conversation));
-        setConversations(data);
+    const unsubs: Array<() => void> = [];
+
+    void (async () => {
+      try {
+        const snap = await getDocs(conversationsQuery);
+        if (cancelled) return;
         window.clearTimeout(timeout);
+        setConversations(snap.docs.map(d => ({ id: d.id, ...d.data() } as Conversation)));
         setLoading(false);
-      },
-      (err) => {
-        console.error('Conversations listener failed:', err);
-        setLoadError('Could not load conversations. Please refresh and try again.');
+      } catch (err) {
+        if (cancelled) return;
+        console.error('Conversations initial load failed:', err);
         window.clearTimeout(timeout);
+        setLoadError(
+          err instanceof Error
+            ? err.message
+            : 'Could not load conversations. Please refresh and try again.',
+        );
         setLoading(false);
-      },
-    );
+        return;
+      }
+
+      if (cancelled) return;
+
+      unsubs.push(
+        onSnapshot(
+          conversationsQuery,
+          snap => {
+            setConversations(snap.docs.map(d => ({ id: d.id, ...d.data() } as Conversation)));
+          },
+          err => {
+            console.error('Conversations listener failed:', err);
+          },
+        ),
+      );
+    })();
+
     return () => {
+      cancelled = true;
       window.clearTimeout(timeout);
-      unsub();
+      unsubs.forEach(u => u());
     };
   }, [businessId]);
 
@@ -140,7 +167,7 @@ export default function Conversations() {
     try {
       const idToken = await auth.currentUser?.getIdToken();
       // ─── FIX: Call backend API to send message to customer ─────────────
-      const response = await fetch('/api/conversations/send', {
+      const response = await fetch(getApiUrl('/api/conversations/send'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -181,7 +208,7 @@ export default function Conversations() {
     setSummarizing(true);
     try {
       const idToken = await auth.currentUser?.getIdToken();
-      const resp = await fetch('/api/ai/summarize', {
+      const resp = await fetch(getApiUrl('/api/ai/summarize'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -252,7 +279,7 @@ export default function Conversations() {
     setSuggestingReply(true);
     try {
       const idToken = await auth.currentUser?.getIdToken();
-      const resp = await fetch('/api/ai/suggest-reply', {
+      const resp = await fetch(getApiUrl('/api/ai/suggest-reply'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

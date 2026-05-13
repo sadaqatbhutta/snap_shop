@@ -9,14 +9,14 @@ import { cn } from '../lib/utils';
 import { useBusiness } from '../context/BusinessContext';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
-import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, getDocs, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { Customer } from '../../../shared/types';
 import { staggerContainer, staggerItem, fadeUp, scaleIn } from '../lib/animations';
 import { TableSkeleton } from '../components/Skeleton';
+import { PAGE_LOAD_TIMEOUT_MS } from '../lib/constants';
 
 type SortKey = keyof Customer | null;
 type FilterChannel = 'all' | 'whatsapp' | 'instagram' | 'facebook' | 'webchat';
-const PAGE_LOAD_TIMEOUT_MS = 10000;
 
 export default function CRM() {
   const { businessId } = useBusiness();
@@ -42,28 +42,59 @@ export default function CRM() {
     }
     setLoading(true);
     setLoadError(null);
+    let cancelled = false;
     const timeout = window.setTimeout(() => {
-      setLoadError('Loading CRM is taking too long. Please retry.');
-      setLoading(false);
-    }, PAGE_LOAD_TIMEOUT_MS);
-    const q = query(collection(db, `businesses/${businessId}/customers`), orderBy('lastInteractionAt', 'desc'));
-    const unsub = onSnapshot(
-      q,
-      snap => {
-        setCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Customer)));
-        window.clearTimeout(timeout);
-        setLoading(false);
-      },
-      (err) => {
-        console.error('CRM listener failed:', err);
-        setLoadError('Could not load CRM data. Please refresh and try again.');
-        window.clearTimeout(timeout);
+      if (!cancelled) {
+        setLoadError('Loading CRM is taking too long. Please retry.');
         setLoading(false);
       }
+    }, PAGE_LOAD_TIMEOUT_MS);
+
+    const customersQuery = query(
+      collection(db, `businesses/${businessId}/customers`),
+      orderBy('lastInteractionAt', 'desc'),
     );
+    const unsubs: Array<() => void> = [];
+
+    void (async () => {
+      try {
+        const snap = await getDocs(customersQuery);
+        if (cancelled) return;
+        window.clearTimeout(timeout);
+        setCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Customer)));
+        setLoading(false);
+      } catch (err) {
+        if (cancelled) return;
+        console.error('CRM initial load failed:', err);
+        window.clearTimeout(timeout);
+        setLoadError(
+          err instanceof Error
+            ? err.message
+            : 'Could not load CRM data. Please refresh and try again.',
+        );
+        setLoading(false);
+        return;
+      }
+
+      if (cancelled) return;
+
+      unsubs.push(
+        onSnapshot(
+          customersQuery,
+          snap => {
+            setCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Customer)));
+          },
+          err => {
+            console.error('CRM listener failed:', err);
+          },
+        ),
+      );
+    })();
+
     return () => {
+      cancelled = true;
       window.clearTimeout(timeout);
-      unsub();
+      unsubs.forEach(u => u());
     };
   }, [businessId]);
 

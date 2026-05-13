@@ -3,6 +3,18 @@ import { getMetrics as getMetricsInternal } from '../utils/metrics.js';
 import { emrQueue, webhookQueue, broadcastQueue, getQueueRuntimeInfo } from '../queues/queue.js';
 import { config } from '../config/config.js';
 
+/** True when EMR_API_URL points at a real host (not template .example.com defaults). */
+export function isEmrIntegrationConfigured(): boolean {
+  try {
+    const host = new URL(config.EMR_API_URL).hostname.toLowerCase();
+    if (host === 'emr.example.com') return false;
+    if (host.endsWith('.example.com')) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function queryLogsForDashboard(query: Record<string, unknown>) {
   return queryLogs(query as any);
 }
@@ -40,6 +52,9 @@ export async function healthCheck() {
     timestamp: new Date().toISOString(),
     uptime_s: Math.floor(process.uptime()),
     queueRuntime,
+    integrations: {
+      emr: { configured: isEmrIntegrationConfigured() },
+    },
     queues: {
       emr: emrWaiting.status === 'fulfilled' ? { waiting: emrWaiting.value } : { error: 'unavailable' },
       webhook: webhookWaiting.status === 'fulfilled' ? { waiting: webhookWaiting.value } : { error: 'unavailable' },

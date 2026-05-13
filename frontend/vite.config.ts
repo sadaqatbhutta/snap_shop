@@ -36,7 +36,7 @@ export default defineConfig(({ mode }) => {
     server: {
       proxy: {
         '/api': {
-          target: 'http://localhost:3040',
+          target: `http://localhost:${env.PORT || '3040'}`,
           changeOrigin: true,
           secure: false,
         },

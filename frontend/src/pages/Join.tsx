@@ -5,6 +5,7 @@ import { onAuthChange } from '../services/authService';
 import { CheckCircle2, AlertCircle, Sparkles, Bot } from 'lucide-react';
 import { motion } from 'motion/react';
 import { JoinSkeleton } from '../components/Skeleton';
+import { getApiUrl } from '../lib/apiBase';
 
 export default function Join() {
   const [searchParams] = useSearchParams();
@@ -27,7 +28,7 @@ export default function Join() {
 
       try {
         const idToken = await user.getIdToken();
-        const resp = await fetch('/api/team/accept', {
+        const resp = await fetch(getApiUrl('/api/team/accept'), {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',

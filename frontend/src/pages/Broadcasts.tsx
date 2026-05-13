@@ -8,14 +8,13 @@ import {
 import { cn } from '../lib/utils';
 import { Link } from 'react-router-dom';
 import { useBusiness } from '../context/BusinessContext';
-import { db } from '../firebase';
-import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc } from 'firebase/firestore';
+import { db, auth } from '../firebase';
+import { collection, query, orderBy, onSnapshot, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore';
 import { Broadcast, Template, Segment } from '../../../shared/types';
 import { staggerContainer, staggerItem, fadeUp, scaleIn } from '../lib/animations';
 import { TableSkeleton } from '../components/Skeleton';
-import { auth } from '../firebase';
-
-const PAGE_LOAD_TIMEOUT_MS = 10000;
+import { getApiUrl } from '../lib/apiBase';
+import { PAGE_LOAD_TIMEOUT_MS } from '../lib/constants';
 
 export default function Broadcasts() {
   const { businessId } = useBusiness();
@@ -39,38 +38,76 @@ export default function Broadcasts() {
     }
     setLoading(true);
     setLoadError(null);
+    let cancelled = false;
     const timeout = window.setTimeout(() => {
-      setLoadError('Loading is taking too long. Please retry in a moment.');
-      setLoading(false);
+      if (!cancelled) {
+        setLoadError('Loading is taking too long. Please retry in a moment.');
+        setLoading(false);
+      }
     }, PAGE_LOAD_TIMEOUT_MS);
 
-    const unsubs = [
-      onSnapshot(query(collection(db, `businesses/${businessId}/broadcasts`), orderBy('createdAt', 'desc')), snap => {
-        setBroadcasts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Broadcast)));
+    const broadcastsQuery = query(
+      collection(db, `businesses/${businessId}/broadcasts`),
+      orderBy('createdAt', 'desc'),
+    );
+    const templatesCol = collection(db, `businesses/${businessId}/templates`);
+    const segmentsCol = collection(db, `businesses/${businessId}/segments`);
+
+    const unsubs: Array<() => void> = [];
+
+    void (async () => {
+      try {
+        const [bSnap, tSnap, sSnap] = await Promise.all([
+          getDocs(broadcastsQuery),
+          getDocs(templatesCol),
+          getDocs(segmentsCol),
+        ]);
+        if (cancelled) return;
         window.clearTimeout(timeout);
+        setBroadcasts(bSnap.docs.map(d => ({ id: d.id, ...d.data() } as Broadcast)));
+        setTemplates(tSnap.docs.map(d => ({ id: d.id, ...d.data() } as Template)));
+        setSegments(sSnap.docs.map(d => ({ id: d.id, ...d.data() } as Segment)));
         setLoading(false);
-      }, (err) => {
-        console.error('Broadcasts listener failed:', err);
-        setLoadError('Could not load broadcasts. Please refresh and try again.');
+      } catch (err) {
+        if (cancelled) return;
+        console.error('Broadcasts initial load failed:', err);
         window.clearTimeout(timeout);
+        setLoadError(
+          err instanceof Error
+            ? err.message
+            : 'Could not load broadcasts. Please refresh and try again.',
+        );
         setLoading(false);
-      }),
-      onSnapshot(
-        collection(db, `businesses/${businessId}/templates`),
-        (snap) => setTemplates(snap.docs.map(d => ({ id: d.id, ...d.data() } as Template))),
-        (err) => {
+        return;
+      }
+
+      if (cancelled) return;
+
+      unsubs.push(
+        onSnapshot(broadcastsQuery, snap => {
+          setBroadcasts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Broadcast)));
+        }, err => {
+          console.error('Broadcasts listener failed:', err);
+        }),
+      );
+      unsubs.push(
+        onSnapshot(templatesCol, snap => {
+          setTemplates(snap.docs.map(d => ({ id: d.id, ...d.data() } as Template)));
+        }, err => {
           console.error('Templates listener failed:', err);
-        }
-      ),
-      onSnapshot(
-        collection(db, `businesses/${businessId}/segments`),
-        (snap) => setSegments(snap.docs.map(d => ({ id: d.id, ...d.data() } as Segment))),
-        (err) => {
+        }),
+      );
+      unsubs.push(
+        onSnapshot(segmentsCol, snap => {
+          setSegments(snap.docs.map(d => ({ id: d.id, ...d.data() } as Segment)));
+        }, err => {
           console.error('Segments listener failed:', err);
-        }
-      ),
-    ];
+        }),
+      );
+    })();
+
     return () => {
+      cancelled = true;
       window.clearTimeout(timeout);
       unsubs.forEach(u => u());
     };
@@ -99,7 +136,7 @@ export default function Broadcasts() {
     if (form.scheduledAt) {
       try {
         const idToken = await auth.currentUser?.getIdToken();
-        const resp = await fetch(`/api/broadcast/${docRef.id}`, {
+        const resp = await fetch(getApiUrl(`/api/broadcast/${docRef.id}`), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
           body: JSON.stringify({ businessId, scheduledAt: new Date(form.scheduledAt).toISOString() }),
@@ -121,7 +158,7 @@ export default function Broadcasts() {
     if (!businessId || !confirm('Are you sure you want to send this broadcast now?')) return;
     try {
       const idToken = await auth.currentUser?.getIdToken();
-      const resp = await fetch(`/api/broadcast/${broadcastId}`, {
+      const resp = await fetch(getApiUrl(`/api/broadcast/${broadcastId}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ businessId }),
@@ -139,7 +176,7 @@ export default function Broadcasts() {
     if (!businessId || !confirm('Delete this broadcast? Scheduled jobs will be cancelled.')) return;
     try {
       const idToken = await auth.currentUser?.getIdToken();
-      const resp = await fetch(`/api/broadcast/${broadcastId}`, {
+      const resp = await fetch(getApiUrl(`/api/broadcast/${broadcastId}`), {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ businessId }),
@@ -162,7 +199,7 @@ export default function Broadcasts() {
       const idToken = await auth.currentUser?.getIdToken();
       const selectedTemplate = templates.find(t => t.id === form.templateId);
       const selectedSegment = segments.find(s => s.id === form.segmentId);
-      const resp = await fetch('/api/ai/generate-broadcast', {
+      const resp = await fetch(getApiUrl('/api/ai/generate-broadcast'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({

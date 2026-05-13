@@ -1,4 +1,5 @@
 import React from 'react';
+import { getApiBaseUrl } from '../lib/apiBase';
 
 type WebchatWidgetProps = {
   businessId: string;
@@ -9,7 +10,7 @@ type WebchatWidgetProps = {
 
 export default function WebchatWidget({
   businessId,
-  apiBase = window.location.origin,
+  apiBase = getApiBaseUrl(),
   title = 'Chat with us',
   position = 'right',
 }: WebchatWidgetProps) {

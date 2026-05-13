@@ -41,6 +41,12 @@ const ConfigSchema = z.object({
   SMTP_API_URL: z.string().optional(),
   APP_URL: z.string().url().default('http://localhost:5173'),
   TIKTOK_WEBHOOK_SECRET: z.string().optional(),
+
+  /** Required in staging/production to access GET /api/logs and GET /api/metrics (via X-Observability-Key). */
+  OBSERVABILITY_KEY: z.preprocess(
+    v => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+    z.string().min(16).optional()
+  ),
 });
 
 const parsed = ConfigSchema.safeParse(process.env);

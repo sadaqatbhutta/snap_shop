@@ -3,6 +3,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import bodyParser from 'body-parser';
 import swaggerUi from 'swagger-ui-express';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 
 import { config } from './src/config/config.js';
 import { apiRouter } from './src/routes/index.js';
@@ -11,13 +14,24 @@ import { requestLogger } from './src/middlewares/requestLogger.js';
 import { registerErrorHandlers, notFoundHandler } from './src/middlewares/errorHandler.js';
 import { swaggerSpec } from './src/utils/swagger.js';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+function resolveFrontendDist(): string {
+  return path.resolve(__dirname, '../frontend/dist');
+}
+
+function spaBuildAvailable(): boolean {
+  const dist = resolveFrontendDist();
+  return fs.existsSync(path.join(dist, 'index.html'));
+}
+
 export async function createApp() {
   const app = express();
 
   app.disable('x-powered-by');
 
-  if (config.NODE_ENV === 'production') {
-    app.use(helmet());
+  if (config.NODE_ENV === 'production' || config.NODE_ENV === 'staging') {
+    app.use(helmet({ contentSecurityPolicy: false }));
   }
 
   const allowedOrigins = config.ALLOWED_ORIGINS.split(',').map(origin => origin.trim());
@@ -42,6 +56,18 @@ export async function createApp() {
 
   app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, { explorer: true }));
   app.use('/api', apiRouter);
+
+  const frontendDist = resolveFrontendDist();
+  if (spaBuildAvailable()) {
+    app.use(express.static(frontendDist, { index: false }));
+    app.use((req, res, next) => {
+      if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+      if (req.path.startsWith('/api')) return next();
+      res.sendFile(path.join(frontendDist, 'index.html'), err => {
+        if (err) next(err);
+      });
+    });
+  }
 
   app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
     if (err.message === 'CORS_NOT_ALLOWED') {

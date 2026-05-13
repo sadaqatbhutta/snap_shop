@@ -15,6 +15,7 @@ import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 
 import { staggerContainer, staggerItem, fadeUp, scaleIn } from '../lib/animations';
 import { logout } from '../services/authService';
 import type { AIMacro } from '../../../shared/types';
+import { getApiBaseUrl, getApiUrl } from '../lib/apiBase';
 
 const WebchatWidget = lazy(() => import('../components/WebchatWidget'));
 
@@ -29,17 +30,6 @@ type RuntimePayload = {
   inlineWorkersEnabled: boolean;
   queueHealthy: boolean;
 };
-
-function getApiBaseUrl() {
-  const fromEnv = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
-  if (fromEnv && fromEnv.trim()) {
-    return fromEnv.replace(/\/$/, '');
-  }
-  if (window.location.hostname === 'localhost') {
-    return 'http://localhost:3040';
-  }
-  return window.location.origin;
-}
 
 // ─── Integrations Panel ───────────────────────────────────────────────────────
 function IntegrationsPanel({ businessId, business, onClose }: { businessId: string; business: any; onClose: () => void }) {
@@ -481,7 +471,7 @@ function TeamPanel({ businessId, onClose }: { businessId: string; onClose: () =>
     setLoading(true);
     try {
       const idToken = await auth.currentUser?.getIdToken();
-      const resp = await fetch('/api/team/invite', {
+      const resp = await fetch(getApiUrl('/api/team/invite'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
         body: JSON.stringify({ businessId, email: inviteEmail, role }),
@@ -557,7 +547,7 @@ function TeamPanel({ businessId, onClose }: { businessId: string; onClose: () =>
                       if (!confirm('Revoke?')) return;
                       try {
                         const idToken = await auth.currentUser?.getIdToken();
-                        const resp = await fetch(`/api/team/invite/${invite.id}`, {
+                        const resp = await fetch(getApiUrl(`/api/team/invite/${invite.id}`), {
                           method: 'DELETE',
                           headers: { Authorization: `Bearer ${idToken}` },
                         });
@@ -612,12 +602,11 @@ export default function Settings() {
   }, [business]);
 
   const readHealth = useCallback(async () => {
-    const apiBase = getApiBaseUrl();
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 3000);
     try {
       setHealthLoading(true);
-      const resp = await fetch(`${apiBase}/api/runtime`, { signal: controller.signal });
+      const resp = await fetch(getApiUrl('/api/runtime'), { signal: controller.signal });
       if (!resp.ok) throw new Error(`Runtime endpoint failed (${resp.status})`);
       const data = (await resp.json()) as RuntimePayload;
       setRuntimeHealth(data);
@@ -684,7 +673,7 @@ export default function Settings() {
 
     try {
       const idToken = await auth.currentUser?.getIdToken();
-      const resp = await fetch(`/api/business/${businessId}`, {
+      const resp = await fetch(getApiUrl(`/api/business/${businessId}`), {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${idToken}`,

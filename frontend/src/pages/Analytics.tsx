@@ -13,6 +13,7 @@ import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { Conversation, Message } from '../../../shared/types';
 import { staggerContainer, staggerItem, fadeUp } from '../lib/animations';
 import { AnalyticsSkeleton } from '../components/Skeleton';
+import { PAGE_LOAD_TIMEOUT_MS } from '../lib/constants';
 
 interface Stats {
   convsByDay: number[];
@@ -21,8 +22,6 @@ interface Stats {
   totalMessages: number;
   escalationRate: number;
 }
-
-const ANALYTICS_LOAD_TIMEOUT_MS = 10000;
 
 function AnimatedNumber({ value }: { value: number }) {
   const motionValue = useMotionValue(0);
@@ -65,7 +64,7 @@ export default function Analytics() {
       try {
       const withTimeout = async <T,>(promise: Promise<T>, label: string): Promise<T> => {
         const timeoutPromise = new Promise<never>((_, reject) => {
-          window.setTimeout(() => reject(new Error(`${label} timed out after ${ANALYTICS_LOAD_TIMEOUT_MS}ms`)), ANALYTICS_LOAD_TIMEOUT_MS);
+          window.setTimeout(() => reject(new Error(`${label} timed out after ${PAGE_LOAD_TIMEOUT_MS}ms`)), PAGE_LOAD_TIMEOUT_MS);
         });
         return Promise.race([promise, timeoutPromise]);
       };
