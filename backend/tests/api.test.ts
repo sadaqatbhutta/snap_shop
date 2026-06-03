@@ -17,14 +17,6 @@ vi.mock('../src/config/firebase.js', () => ({
   },
 }));
 
-process.env.NODE_ENV = 'test';
-process.env.GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'test-key';
-process.env.FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || 'test-project';
-process.env.WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || 'a'.repeat(32);
-process.env.WEBHOOK_VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN || 'verify-token';
-process.env.META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || 'meta-token';
-process.env.WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '123';
-
 import { createApp } from '../app.js';
 
 let app: any;

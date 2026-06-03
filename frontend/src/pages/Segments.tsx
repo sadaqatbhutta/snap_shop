@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Users, Plus, Search, Edit2, Trash2, ChevronLeft, UserPlus,
   Tag, Hash, X, Calendar, MessageCircle, Filter, Loader2
@@ -9,11 +9,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useBusiness } from '../context/BusinessContext';
 import { db } from '../firebase';
 import {
-  collection, query, orderBy, onSnapshot, addDoc, updateDoc,
+  collection, query, addDoc, updateDoc,
   deleteDoc, doc, getDocs, where
 } from 'firebase/firestore';
 import { Segment } from '../../../shared/types';
-import { staggerContainer, staggerItem, fadeUp, scaleIn } from '../lib/animations';
+import { useFirestoreCollection } from '../lib/useFirestoreCollection';
+import LoadErrorBanner from '../components/LoadErrorBanner';
+import { staggerContainer, staggerItem, fadeUp } from '../lib/animations';
 
 const defaultForm = {
   name: '', description: '', channel: 'all', tags: '',
@@ -22,20 +24,20 @@ const defaultForm = {
 
 export default function Segments() {
   const { businessId } = useBusiness();
-  const [segments, setSegments] = useState<Segment[]>([]);
+  const {
+    items: segments,
+    error: loadError,
+    retry,
+  } = useFirestoreCollection<Segment>(businessId, 'segments', {
+    orderByField: 'createdAt',
+    silent: true,
+    timeoutLabel: 'Loading segments is taking too long. Please retry.',
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState(defaultForm);
   const [editingId, setEditingId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!businessId) return;
-    return onSnapshot(
-      query(collection(db, `businesses/${businessId}/segments`), orderBy('createdAt', 'desc')),
-      snap => setSegments(snap.docs.map(d => ({ id: d.id, ...d.data() } as Segment)))
-    );
-  }, [businessId]);
 
   const openCreate = () => {
     setEditingId(null);
@@ -151,6 +153,10 @@ export default function Segments() {
     s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     s.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  if (loadError) {
+    return <LoadErrorBanner message={loadError} onRetry={retry} />;
+  }
 
   return (
     <div className="space-y-6 text-gray-900">

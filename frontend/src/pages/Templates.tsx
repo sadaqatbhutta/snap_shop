@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   FileText, Plus, Search, Edit2, Trash2, Copy, Layout,
@@ -13,28 +13,28 @@ import { Link } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { useBusiness } from '../context/BusinessContext';
 import { db } from '../firebase';
-import {
-  collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, updateDoc
-} from 'firebase/firestore';
+import { collection, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { Template } from '../../../shared/types';
+import { useFirestoreCollection } from '../lib/useFirestoreCollection';
+import LoadErrorBanner from '../components/LoadErrorBanner';
 import { staggerContainer, staggerItem, fadeUp, scaleIn } from '../lib/animations';
 
 export default function Templates() {
   const { businessId } = useBusiness();
-  const [templates, setTemplates] = useState<Template[]>([]);
+  const {
+    items: templates,
+    error: loadError,
+    retry,
+  } = useFirestoreCollection<Template>(businessId, 'templates', {
+    orderByField: 'createdAt',
+    silent: true,
+    timeoutLabel: 'Loading templates is taking too long. Please retry.',
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: '', content: '', type: 'text' as 'text' | 'image' });
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!businessId) return;
-    return onSnapshot(
-      query(collection(db, `businesses/${businessId}/templates`), orderBy('createdAt', 'desc')),
-      snap => setTemplates(snap.docs.map(d => ({ id: d.id, ...d.data() } as Template)))
-    );
-  }, [businessId]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,6 +74,10 @@ export default function Templates() {
     t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     t.content.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  if (loadError) {
+    return <LoadErrorBanner message={loadError} onRetry={retry} />;
+  }
 
   return (
     <div className="space-y-6">

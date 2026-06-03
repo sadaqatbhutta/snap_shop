@@ -6,7 +6,7 @@ import { cn } from '../lib/utils';
 import { useBusiness } from '../context/BusinessContext';
 import type { OnboardingProgress } from '../../../shared/types';
 import { db } from '../firebase';
-import { collection, query, orderBy, limit, onSnapshot, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, getDocs, doc, updateDoc, where } from 'firebase/firestore';
 import { Conversation, Broadcast } from '../../../shared/types';
 import { staggerContainer, staggerItem, fadeUp } from '../lib/animations';
 import { DashboardSkeleton } from '../components/Skeleton';
@@ -39,42 +39,34 @@ export default function Dashboard() {
 
     setLoading(false);
 
-    // Live recent conversations
     const recentConvUnsub = onSnapshot(
       query(collection(db, `businesses/${businessId}/conversations`), orderBy('updatedAt', 'desc'), limit(5)),
       snap => {
         setConversations(snap.docs.map(d => ({ id: d.id, ...d.data() } as Conversation)));
-      }
+      },
     );
 
-    const convStatsUnsub = onSnapshot(
-      collection(db, `businesses/${businessId}/conversations`),
-      snap => {
-        const allConversations = snap.docs.map(d => d.data() as Conversation);
-        setTotalConversations(snap.size);
-        setTotalActiveChats(allConversations.filter(c => c.status === 'active').length);
-      }
-    );
-
-    // Live broadcasts
     const bcUnsub = onSnapshot(
       query(collection(db, `businesses/${businessId}/broadcasts`), orderBy('createdAt', 'desc'), limit(3)),
-      snap => setBroadcasts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Broadcast)))
+      snap => setBroadcasts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Broadcast))),
     );
 
-    const bcStatsUnsub = onSnapshot(
-      collection(db, `businesses/${businessId}/broadcasts`),
-      snap => {
-        const allBroadcasts = snap.docs.map(d => d.data() as Broadcast);
-        setTotalBroadcastsSent(allBroadcasts.filter(b => b.status === 'sent').length);
-      }
-    );
+    setTotalConversations(convTotal);
+    getDocs(query(collection(db, `businesses/${businessId}/conversations`), where('status', '==', 'active')))
+      .then(s => setTotalActiveChats(s.size))
+      .catch(() => setTotalActiveChats(0));
+    getDocs(query(collection(db, `businesses/${businessId}/broadcasts`), where('status', '==', 'sent')))
+      .then(s => setTotalBroadcastsSent(s.size))
+      .catch(() => setTotalBroadcastsSent(0));
+    getDocs(collection(db, `businesses/${businessId}/customers`))
+      .then(s => setCustomerCount(s.size))
+      .catch(() => setCustomerCount(0));
 
-    // Customer count (non-blocking)
-    getDocs(collection(db, `businesses/${businessId}/customers`)).then(s => setCustomerCount(s.size)).catch(() => setCustomerCount(0));
-
-    return () => { recentConvUnsub(); convStatsUnsub(); bcUnsub(); bcStatsUnsub(); };
-  }, [businessId]);
+    return () => {
+      recentConvUnsub();
+      bcUnsub();
+    };
+  }, [businessId, convTotal]);
 
   const activeCount = totalActiveChats;
 

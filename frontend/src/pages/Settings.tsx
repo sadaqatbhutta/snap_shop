@@ -10,12 +10,14 @@ import {
 import { cn } from '../lib/utils';
 import { useBusiness } from '../context/BusinessContext';
 import { db, auth } from '../firebase';
-import { collection, onSnapshot, query, orderBy, doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
-import { staggerContainer, staggerItem, fadeUp, scaleIn } from '../lib/animations';
+import { staggerContainer, staggerItem, scaleIn } from '../lib/animations';
 import { logout } from '../services/authService';
 import type { AIMacro } from '../../../shared/types';
 import { getApiBaseUrl, getApiUrl } from '../lib/apiBase';
+import { useFirestoreCollection } from '../lib/useFirestoreCollection';
+import LoadErrorBanner from '../components/LoadErrorBanner';
 
 const WebchatWidget = lazy(() => import('../components/WebchatWidget'));
 
@@ -410,34 +412,16 @@ function BillingPanel({ onClose }: { onClose: () => void }) {
           <button aria-label="Close billing panel" onClick={onClose} className="p-2 hover:bg-white/20 rounded-full"><X className="w-5 h-5" /></button>
         </div>
         <div className="p-6 space-y-6">
-          <div className="p-5 bg-indigo-600 rounded-2xl text-white">
-            <p className="text-xs font-bold uppercase tracking-wider text-indigo-200 mb-1">Current Plan</p>
-            <p className="text-2xl font-bold">Free Plan</p>
-            <p className="text-indigo-200 text-sm mt-1">Up to 500 messages/month</p>
-          </div>
-          <div className="space-y-3">
-            {[
-              { plan: 'Starter', price: '$29/mo', features: '5,000 messages, 3 channels' },
-              { plan: 'Growth', price: '$79/mo', features: '25,000 messages, all channels' },
-              { plan: 'Enterprise', price: 'Custom', features: 'Unlimited, dedicated support' },
-            ].map(p => (
-              <div key={p.plan} className="flex items-center justify-between p-4 border border-gray-200 rounded-xl hover:border-indigo-300 transition-colors">
-                <div>
-                  <p className="font-semibold text-gray-900 text-sm">{p.plan}</p>
-                  <p className="text-xs text-gray-500">{p.features}</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-bold text-indigo-600 text-sm">{p.price}</p>
-                  <button
-                    onClick={() => window.open(`mailto:sales@snapshop.ai?subject=${encodeURIComponent(`Upgrade to ${p.plan} plan`)}`, '_blank')}
-                    className="text-xs text-indigo-600 hover:underline"
-                  >
-                    Upgrade
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+          <p className="text-sm text-gray-600">
+            Paid plans and in-app checkout are not enabled yet. Contact us for pricing, limits, and onboarding.
+          </p>
+          <button
+            type="button"
+            onClick={() => window.open('mailto:sales@snapshop.ai?subject=SnapShop%20billing%20inquiry', '_blank')}
+            className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700"
+          >
+            Contact sales
+          </button>
           <button onClick={onClose} className="w-full px-4 py-2 border border-gray-200 bg-white text-gray-700 rounded-lg text-sm font-bold hover:bg-gray-50">Close</button>
         </div>
       </div>
@@ -447,24 +431,19 @@ function BillingPanel({ onClose }: { onClose: () => void }) {
 
 // ─── Team Panel ───────────────────────────────────────────────────────────────
 function TeamPanel({ businessId, onClose }: { businessId: string; onClose: () => void }) {
-  const [agents, setAgents] = useState<any[]>([]);
-  const [invites, setInvites] = useState<any[]>([]);
+  const { items: agents } = useFirestoreCollection<{ id: string; name?: string; email?: string; role?: string }>(
+    businessId,
+    'agents',
+    { silent: true },
+  );
+  const { items: invites, error: teamLoadError, retry: retryTeam } = useFirestoreCollection<{ id: string; email?: string; role?: string; createdAt?: string; expiresAt?: string; used?: boolean }>(
+    businessId,
+    'invites',
+    { orderByField: 'createdAt', silent: true, timeoutLabel: 'Loading team data is taking too long. Please retry.' },
+  );
   const [inviteEmail, setInviteEmail] = useState('');
   const [role, setRole] = useState<'admin' | 'agent'>('agent');
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!businessId) return;
-    const unsubs = [
-      onSnapshot(collection(db, `businesses/${businessId}/agents`), snap => 
-        setAgents(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-      ),
-      onSnapshot(query(collection(db, `businesses/${businessId}/invites`), orderBy('createdAt', 'desc')), snap => 
-        setInvites(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-      ),
-    ];
-    return () => unsubs.forEach(u => u());
-  }, [businessId]);
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -507,6 +486,7 @@ function TeamPanel({ businessId, onClose }: { businessId: string; onClose: () =>
         </div>
 
         <div className="flex-1 overflow-y-auto p-8 space-y-10">
+          {teamLoadError && <LoadErrorBanner message={teamLoadError} onRetry={retryTeam} />}
           <section className="space-y-6">
             <h3 className="text-lg font-black text-gray-900 flex items-center gap-2 px-1"><UserPlus className="w-5 h-5 text-indigo-600" /> Invite Teammate</h3>
             <form onSubmit={handleInvite} className="flex flex-col md:flex-row gap-4 p-6 bg-gray-50 rounded-3xl border border-gray-100 shadow-sm transition-all hover:bg-white hover:shadow-md">
@@ -542,7 +522,7 @@ function TeamPanel({ businessId, onClose }: { businessId: string; onClose: () =>
               <div className="grid gap-3 opacity-60">
                 {invites.filter(i => !i.used).map(invite => (
                   <div key={invite.id} className="flex items-center justify-between p-4 border border-dashed border-gray-200 rounded-2xl">
-                    <div className="flex items-center gap-3"><Mail className="w-5 h-5 text-gray-400" /><div><p className="text-sm font-bold text-gray-600">{invite.email}</p><p className="text-[10px] text-gray-400">Expires {new Date(invite.expiresAt).toLocaleDateString()}</p></div></div>
+                    <div className="flex items-center gap-3"><Mail className="w-5 h-5 text-gray-400" /><div><p className="text-sm font-bold text-gray-600">{invite.email}</p><p className="text-[10px] text-gray-400">Expires {invite.expiresAt ? new Date(invite.expiresAt).toLocaleDateString() : '—'}</p></div></div>
                     <button onClick={async () => {
                       if (!confirm('Revoke?')) return;
                       try {
@@ -664,7 +644,7 @@ export default function Settings() {
     { icon: Lock, label: 'Security', description: 'Manage your password and account security.', panel: 'security' as const },
     { icon: Users, label: 'Team', description: 'Collaborate with agents and admins.', panel: 'team' as const },
     { icon: Globe, label: 'Integrations', description: 'Connect WhatsApp, Instagram, and more.', panel: 'integrations' as const },
-    { icon: CreditCard, label: 'Billing', description: 'Manage your subscription and payments.', panel: 'billing' as const },
+    { icon: CreditCard, label: 'Billing', description: 'Contact sales for plans and limits.', panel: 'billing' as const },
   ];
 
   const handleDeleteAccount = async () => {

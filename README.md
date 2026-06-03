@@ -144,6 +144,21 @@ The widget posts messages to `/api/webchat/message`, which flows into the same A
 
 ---
 
+## Firebase (rules, indexes, access)
+
+1. Install Firebase CLI and log in: `npm install -g firebase-tools` then `firebase login`.
+2. Select your project: `firebase use <FIREBASE_PROJECT_ID>`.
+3. Deploy rules and composite indexes from this repo:
+   ```bash
+   firebase deploy --only firestore:rules,firestore:indexes
+   ```
+4. In **Authentication**, enable the sign-in providers your app uses (Google / Email).
+5. Ensure each owner has a document **`businesses/{authUid}`** with **`ownerEmail`** matching their login email.
+6. For teammates, add **`businesses/{businessId}/agents/{theirAuthUid}`** after they accept an invite.
+7. If the browser console shows a missing index link, open it and create the index, or redeploy indexes after updating [`firestore.indexes.json`](firestore.indexes.json).
+
+---
+
 ## Deployment Safety Checklist
 
 Use this checklist before pushing to staging/production:
