@@ -229,7 +229,7 @@ export function AnalyticsSkeleton() {
 export function AuthScreenSkeleton() {
   return (
     <div className="min-h-screen flex bg-white">
-      <div className="hidden lg:block lg:w-1/2 bg-indigo-600" />
+      <div className="hidden lg:block lg:w-1/2 bg-teal-700" />
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gray-50/50">
         <div className="w-full max-w-md space-y-6">
           <Skeleton className="h-8 w-48" />

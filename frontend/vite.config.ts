@@ -17,6 +17,18 @@ export default defineConfig(({ mode }) => {
       },
     },
     envDir: path.resolve(__dirname, '..'),
+    optimizeDeps: {
+      include: [
+        'firebase/app',
+        'firebase/auth',
+        'firebase/firestore',
+        'motion/react',
+        'react',
+        'react-dom',
+        'react-router-dom',
+        'lucide-react',
+      ],
+    },
     build: {
       rollupOptions: {
         output: {
@@ -36,7 +48,7 @@ export default defineConfig(({ mode }) => {
     server: {
       proxy: {
         '/api': {
-          target: `http://localhost:${env.PORT || '3040'}`,
+          target: `http://localhost:${env.PORT || '3000'}`,
           changeOrigin: true,
           secure: false,
         },

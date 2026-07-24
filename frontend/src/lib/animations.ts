@@ -22,28 +22,28 @@ export const staggerContainer: Variants = {
   initial: {},
   animate: {
     transition: {
-      staggerChildren: 0.07,
-      delayChildren: 0.01,
+      staggerChildren: 0.03,
+      delayChildren: 0,
     },
   },
 }
 
 export const staggerItem: Variants = {
-  initial: { opacity: 0, y: 10, scale: 0.992 },
-  animate: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.2, ease: 'easeOut' } },
-  exit: { opacity: 0, y: -6, scale: 0.992, transition: { duration: 0.14 } },
+  initial: { opacity: 0, y: 6 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.14, ease: 'easeOut' } },
+  exit: { opacity: 0, transition: { duration: 0.08 } },
 }
 
 export const scaleIn: Variants = {
-  initial: { opacity: 0, scale: 0.97, y: 4 },
-  animate: { opacity: 1, scale: 1, y: 0, transition: { duration: 0.16, ease: 'easeOut' } },
-  exit: { opacity: 0, scale: 0.97, y: 4, transition: { duration: 0.12 } },
+  initial: { opacity: 0, scale: 0.98 },
+  animate: { opacity: 1, scale: 1, transition: { duration: 0.12, ease: 'easeOut' } },
+  exit: { opacity: 0, scale: 0.98, transition: { duration: 0.08 } },
 }
 
 export const pageTransition: Variants = {
-  initial: { opacity: 0, y: 10, scale: 0.995 },
-  animate: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.2, ease: 'easeOut' } },
-  exit: { opacity: 0, y: -8, scale: 0.995, transition: { duration: 0.14 } },
+  initial: { opacity: 0, y: 4 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.12, ease: 'easeOut' } },
+  exit: { opacity: 0, transition: { duration: 0.08 } },
 }
 
 const animations = {

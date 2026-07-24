@@ -7,7 +7,7 @@ export default function Terms() {
   return (
     <motion.div className="max-w-3xl mx-auto py-8 px-4 space-y-6" variants={fadeUp} initial="initial" animate="animate">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600 mb-2">Legal</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-teal-700 mb-2">Legal</p>
         <h1 className="text-3xl font-bold text-gray-900">Terms of Service</h1>
         <p className="text-sm text-gray-500 mt-2">Last updated: July 23, 2026</p>
       </div>
@@ -40,11 +40,11 @@ export default function Terms() {
         </p>
         <h2 className="text-lg font-semibold text-gray-900 pt-2">Contact</h2>
         <p>
-          Legal: <a className="text-indigo-600 underline" href="mailto:legal@snapshop.ai">legal@snapshop.ai</a>
+          Legal: <a className="text-teal-700 underline" href="mailto:legal@snapshop.ai">legal@snapshop.ai</a>
         </p>
       </section>
 
-      <Link to="/settings" className="inline-block text-sm font-semibold text-indigo-600 hover:underline">
+      <Link to="/settings" className="inline-block text-sm font-semibold text-teal-700 hover:underline">
         ← Back to Settings
       </Link>
     </motion.div>

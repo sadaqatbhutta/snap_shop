@@ -157,7 +157,7 @@ export default function Analytics() {
     .slice(0, 5);
 
   const intentColors: Record<string, string> = {
-    inquiry: 'bg-indigo-500',
+    inquiry: 'bg-teal-600',
     order_request: 'bg-green-500',
     complaint: 'bg-red-500',
     greeting: 'bg-yellow-500',
@@ -235,7 +235,7 @@ export default function Analytics() {
             {stats?.convsByDay.map((v, i) => (
               <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
                 <div
-                  className="w-full bg-indigo-500 rounded-t hover:bg-indigo-600 transition-colors"
+                  className="w-full bg-teal-600 rounded-t hover:bg-teal-700 transition-colors"
                   style={{ height: `${Math.max(4, (v / maxConv) * 100)}%` }}
                 />
                 <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
@@ -271,7 +271,7 @@ export default function Analytics() {
                     <span className="font-bold text-gray-900">{Math.round((count / channelTotal) * 100)}%</span>
                   </div>
                   <div className="w-full bg-gray-100 rounded-full h-2">
-                    <div className="h-2 rounded-full bg-indigo-500" style={{ width: `${(count / channelTotal) * 100}%` }} />
+                    <div className="h-2 rounded-full bg-teal-600" style={{ width: `${(count / channelTotal) * 100}%` }} />
                   </div>
                 </div>
               ))}
@@ -301,7 +301,7 @@ export default function Analytics() {
                 </div>
                 <div className="w-full bg-gray-100 rounded-full h-2">
                   <div
-                    className={cn('h-2 rounded-full', intentColors[intent] || 'bg-indigo-400')}
+                    className={cn('h-2 rounded-full', intentColors[intent] || 'bg-teal-500')}
                     style={{ width: `${(count / intentTotal) * 100}%` }}
                   />
                 </div>

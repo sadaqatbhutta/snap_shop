@@ -175,7 +175,7 @@ export default function Segments() {
             <p className="text-gray-500">Group your customers for targeted broadcasts.</p>
           </div>
         </div>
-        <button onClick={openCreate} className="hover-lift flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">
+        <button onClick={openCreate} className="hover-lift flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-teal-700 rounded-lg hover:bg-teal-800">
           <Plus className="w-4 h-4" /> Create Segment
         </button>
       </motion.div>
@@ -225,8 +225,8 @@ export default function Segments() {
                 >
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-indigo-50 rounded-lg">
-                        <Users className="w-4 h-4 text-indigo-600" />
+                      <div className="p-2 bg-teal-50 rounded-lg">
+                        <Users className="w-4 h-4 text-teal-700" />
                       </div>
                       <p className="text-sm font-medium">{segment.name}</p>
                     </div>
@@ -253,7 +253,7 @@ export default function Segments() {
                     <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => openEdit(segment)}
-                        className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-indigo-600"
+                        className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-teal-700"
                         title="Edit"
                       >
                         <Edit2 className="w-4 h-4" />
@@ -276,10 +276,10 @@ export default function Segments() {
 
       <div
         onClick={openCreate}
-        className="glass-panel glow-border bg-gray-50/80 rounded-xl border-2 border-dashed border-gray-300 p-12 flex flex-col items-center justify-center gap-4 hover:bg-gray-100 hover:border-indigo-300 transition-all group cursor-pointer hover-lift"
+        className="glass-panel glow-border bg-gray-50/80 rounded-xl border-2 border-dashed border-gray-300 p-12 flex flex-col items-center justify-center gap-4 hover:bg-gray-100 hover:border-teal-300 transition-all group cursor-pointer hover-lift"
       >
         <div className="p-4 bg-white rounded-full shadow-sm group-hover:scale-110 transition-transform">
-          <UserPlus className="w-8 h-8 text-indigo-600" />
+          <UserPlus className="w-8 h-8 text-teal-700" />
         </div>
         <div className="text-center">
           <h3 className="text-lg font-semibold">Create a Custom Segment</h3>
@@ -305,7 +305,7 @@ export default function Segments() {
               transition={{ duration: 0.2 }}
               className="glass-panel glow-border relative w-full max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden"
             >
-              <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-indigo-600 text-white">
+              <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-teal-700 text-white">
                 <h2 className="text-xl font-bold flex items-center gap-2">
                   <Users className="w-6 h-6" />
                   {editingId ? 'Edit Segment' : 'Create New Segment'}
@@ -319,26 +319,26 @@ export default function Segments() {
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Segment Name</label>
                   <input required type="text" placeholder="e.g. High-Value WhatsApp Users"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-600 outline-none text-sm"
                     value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
                   <textarea rows={2} placeholder="What is this segment for?"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm resize-none"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-600 outline-none text-sm resize-none"
                     value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} />
                 </div>
 
                 <div className="space-y-4 pt-2 border-t border-gray-100">
                   <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                    <Filter className="w-4 h-4 text-indigo-600" /> Define Criteria
+                    <Filter className="w-4 h-4 text-teal-700" /> Define Criteria
                   </h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Channel</label>
                       <div className="relative">
                         <MessageCircle className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <select className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none appearance-none bg-white text-sm"
+                        <select className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-600 outline-none appearance-none bg-white text-sm"
                           value={formData.channel} onChange={e => setFormData({ ...formData, channel: e.target.value })}>
                           <option value="all">All Channels</option>
                           <option value="whatsapp">WhatsApp</option>
@@ -353,7 +353,7 @@ export default function Segments() {
                       <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Last Interaction</label>
                       <div className="relative">
                         <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <select className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none appearance-none bg-white text-sm"
+                        <select className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-600 outline-none appearance-none bg-white text-sm"
                           value={formData.lastInteraction} onChange={e => setFormData({ ...formData, lastInteraction: e.target.value })}>
                           <option value="any">Any Time</option>
                           <option value="7d">Last 7 Days</option>
@@ -371,7 +371,7 @@ export default function Segments() {
                         {(['AND', 'OR'] as const).map(logic => (
                           <button key={logic} type="button" onClick={() => setFormData({ ...formData, tagLogic: logic })}
                             className={cn('px-3 py-1 text-[10px] font-bold rounded-md transition-all',
-                              formData.tagLogic === logic ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-400 hover:text-gray-600'
+                              formData.tagLogic === logic ? 'bg-teal-700 text-white shadow-sm' : 'text-gray-400 hover:text-gray-600'
                             )}>
                             {logic}
                           </button>
@@ -381,7 +381,7 @@ export default function Segments() {
                     <div className="relative">
                       <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <input type="text" placeholder="e.g. vip, lead, interested"
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-600 outline-none text-sm"
                         value={formData.tags} onChange={e => setFormData({ ...formData, tags: e.target.value })} />
                     </div>
                   </div>
@@ -399,7 +399,7 @@ export default function Segments() {
 
                 <div className="flex gap-3 pt-2">
                   <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancel</button>
-                  <button type="submit" disabled={saving} className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-60 flex items-center justify-center gap-2">
+                  <button type="submit" disabled={saving} className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-teal-700 rounded-lg hover:bg-teal-800 disabled:opacity-60 flex items-center justify-center gap-2">
                     {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                     {editingId ? 'Update Segment' : 'Save Segment'}
                   </button>

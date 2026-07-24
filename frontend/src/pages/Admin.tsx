@@ -102,8 +102,8 @@ export default function Admin() {
   return (
     <motion.div className="max-w-5xl mx-auto space-y-6" variants={fadeUp} initial="initial" animate="animate">
       <div className="flex items-center gap-3">
-        <div className="p-2 bg-indigo-50 rounded-lg">
-          <Shield className="w-6 h-6 text-indigo-600" />
+        <div className="p-2 bg-teal-50 rounded-lg">
+          <Shield className="w-6 h-6 text-teal-700" />
         </div>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Platform Admin</h1>

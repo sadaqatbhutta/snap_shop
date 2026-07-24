@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   LayoutDashboard, MessageSquare, Users, Settings, LogOut,
@@ -17,25 +17,23 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
-  const navigate = useNavigate();
   const user = auth.currentUser;
-  const { dataStatus, lastError, refreshBusiness } = useBusiness();
+  const { business, dataStatus, lastError, refreshBusiness } = useBusiness();
   const [profileOpen, setProfileOpen] = useState(false);
   const [retryingData, setRetryingData] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const navItems = [
-    { icon: LayoutDashboard, label: 'Dashboard',     path: '/' },
-    { icon: MessageSquare,   label: 'Conversations', path: '/conversations' },
-    { icon: Megaphone,       label: 'Broadcasts',    path: '/broadcasts' },
-    { icon: Users,           label: 'CRM',           path: '/crm' },
-    { icon: Bot,             label: 'AI Settings',   path: '/ai-settings' },
-    { icon: TrendingUp,      label: 'Analytics',     path: '/analytics' },
-    { icon: Settings,        label: 'Settings',      path: '/settings' },
-    { icon: Shield,          label: 'Admin',         path: '/admin' },
+    { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
+    { icon: MessageSquare, label: 'Conversations', path: '/conversations' },
+    { icon: Megaphone, label: 'Broadcasts', path: '/broadcasts' },
+    { icon: Users, label: 'CRM', path: '/crm' },
+    { icon: Bot, label: 'AI Settings', path: '/ai-settings' },
+    { icon: TrendingUp, label: 'Analytics', path: '/analytics' },
+    { icon: Settings, label: 'Settings', path: '/settings' },
+    { icon: Shield, label: 'Admin', path: '/admin' },
   ];
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -64,96 +62,84 @@ export default function Layout({ children }: LayoutProps) {
     ? user.displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     : user?.email?.charAt(0).toUpperCase() || 'U';
 
+  const pageLabel = navItems.find(item => item.path === location.pathname)?.label || 'SnapShop';
+
   return (
     <div className="relative flex h-screen overflow-hidden">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="float-orb absolute -top-20 -left-20 h-72 w-72 rounded-full bg-indigo-300/25 blur-3xl" />
-        <div className="float-orb absolute -bottom-24 right-1/4 h-80 w-80 rounded-full bg-violet-300/20 blur-3xl [animation-delay:1.6s]" />
-        <div className="float-orb absolute top-1/3 -right-24 h-64 w-64 rounded-full bg-fuchsia-300/20 blur-3xl [animation-delay:0.8s]" />
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="mesh-orb -top-16 -left-10 h-72 w-72 bg-teal-300/30" />
+        <div className="mesh-orb bottom-0 right-1/4 h-80 w-80 bg-slate-400/15 [animation-delay:1.4s]" />
+        <div className="mesh-orb top-1/3 -right-20 h-64 w-64 bg-teal-500/15 [animation-delay:0.7s]" />
       </div>
-      {/* Sidebar */}
-      <motion.aside
-        className="glass-panel glow-border relative z-10 w-64 border-r border-gray-200/70 flex flex-col"
-        initial={{ x: -20, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        transition={{ duration: 0.3, ease: 'easeOut' }}
-      >
-        <motion.div
-          className="p-6"
-          initial={{ opacity: 0, x: -12 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.1, duration: 0.3 }}
-        >
-          <h1 className="text-2xl font-bold text-indigo-600 flex items-center gap-2">
-            <Bot className="w-8 h-8" />
-            SnapShop
-          </h1>
-        </motion.div>
 
-        <nav className="flex-1 px-4 space-y-1.5">
-          {navItems.map((item) => {
+      <motion.aside
+        className="relative z-10 w-[16.5rem] border-r border-[var(--line)] bg-white/55 backdrop-blur-xl flex flex-col"
+        initial={{ x: -16, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ duration: 0.35, ease: 'easeOut' }}
+      >
+        <div className="px-5 pt-6 pb-4">
+          <Link to="/" className="block group">
+            <p className="font-display brand-mark text-[1.85rem] leading-none text-[var(--ink)] group-hover:text-[var(--accent-deep)] transition-colors">
+              SnapShop
+            </p>
+            <p className="mt-1 text-[11px] uppercase tracking-[0.22em] font-semibold text-teal-800/70">
+              AI workspace
+            </p>
+          </Link>
+          {business?.name && (
+            <p className="mt-4 text-xs text-[var(--ink-soft)] truncate border border-[var(--line)] rounded-xl px-3 py-2 bg-white/60">
+              {business.name}
+            </p>
+          )}
+        </div>
+
+        <nav className="flex-1 px-3 space-y-1 overflow-y-auto pb-4">
+          {navItems.map(item => {
             const isActive = location.pathname === item.path;
             return (
-              <motion.div
+              <Link
                 key={item.path}
-                whileHover={{ x: 4 }}
-                whileTap={{ scale: 0.97 }}
-                transition={{ duration: 0.15 }}
+                to={item.path}
+                className={cn(
+                  'flex items-center gap-3 px-3.5 py-2.5 text-[13px] font-medium rounded-xl transition-colors',
+                  isActive ? 'nav-active' : 'text-slate-600 hover:bg-white/70 hover:text-[var(--ink)]'
+                )}
               >
-                <Link
-                  to={item.path}
-                  className={cn(
-                    'hover-lift flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors relative',
-                    isActive
-                      ? 'text-indigo-700'
-                      : 'text-gray-600 hover:text-gray-900'
-                  )}
-                >
-                  {isActive && (
-                    <motion.div
-                      layoutId="active-nav-pill"
-                      className="absolute inset-0 bg-indigo-50/90 rounded-lg -z-10 pulse-glow"
-                      transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
-                    />
-                  )}
-                  <item.icon className="w-5 h-5" />
-                  {item.label}
-                </Link>
-              </motion.div>
+                <item.icon className={cn('w-4.5 h-4.5', isActive ? 'text-teal-700' : 'text-slate-500')} />
+                {item.label}
+              </Link>
             );
           })}
         </nav>
 
-        <div className="p-4 border-t border-gray-200">
-          <motion.button
+        <div className="p-3 border-t border-[var(--line)]">
+          <button
             onClick={handleLogout}
-            className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-red-600 rounded-lg hover:bg-red-50 w-full transition-colors"
-            whileHover={{ x: 4 }}
-            whileTap={{ scale: 0.97 }}
-            transition={{ duration: 0.15 }}
+            className="flex items-center gap-3 px-3.5 py-2.5 text-[13px] font-medium text-rose-700 rounded-xl hover:bg-rose-50 w-full"
           >
-            <LogOut className="w-5 h-5" />
-            Logout
-          </motion.button>
+            <LogOut className="w-4.5 h-4.5" />
+            Sign out
+          </button>
         </div>
       </motion.aside>
 
-      {/* Main Content */}
       <main className="relative z-10 flex-1 overflow-y-auto">
-        <header className="glass-panel h-16 flex items-center justify-between px-8 sticky top-0 z-10 shadow-sm">
-          <div className="flex items-center gap-3">
-            <h2 className="text-lg font-semibold text-gray-800">
-              {navItems.find(item => item.path === location.pathname)?.label || 'SnapShop'}
-            </h2>
+        <header className="h-16 flex items-center justify-between px-6 md:px-8 sticky top-0 z-10 bg-white/55 backdrop-blur-xl border-b border-[var(--line)]">
+          <div className="flex items-center gap-3 min-w-0">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.18em] font-semibold text-teal-800/60">Workspace</p>
+              <h2 className="font-display text-xl text-[var(--ink)] leading-tight">{pageLabel}</h2>
+            </div>
             {dataStatus === 'degraded' && (
-              <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 text-xs font-semibold">
+              <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 text-xs font-semibold">
                 <AlertTriangle className="w-3.5 h-3.5" />
-                Data sync delayed
+                Sync delayed
                 <button
                   type="button"
                   onClick={handleRetryData}
                   disabled={retryingData}
-                  className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-amber-200 hover:bg-amber-100 disabled:opacity-60 hover-lift"
+                  className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-amber-200 hover:bg-amber-100 disabled:opacity-60"
                   title={lastError || 'Retry data sync'}
                 >
                   <RefreshCw className={cn('w-3 h-3', retryingData && 'animate-spin')} />
@@ -163,102 +149,64 @@ export default function Layout({ children }: LayoutProps) {
             )}
           </div>
 
-          {/* Profile Dropdown */}
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setProfileOpen(!profileOpen)}
-              className="hover-lift flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-100/80 transition-colors"
+              className="flex items-center gap-3 px-2.5 py-1.5 rounded-xl hover:bg-white/80 border border-transparent hover:border-[var(--line)]"
             >
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-semibold text-gray-900 leading-tight">
+                <p className="text-sm font-semibold text-[var(--ink)] leading-tight">
                   {user?.displayName || user?.email?.split('@')[0] || 'User'}
                 </p>
-                <p className="text-xs text-gray-500 leading-tight">{user?.email || ''}</p>
+                <p className="text-xs text-slate-500 leading-tight">{user?.email || ''}</p>
               </div>
-
               {user?.photoURL ? (
-                <img
-                  src={user.photoURL}
-                  alt="Profile"
-                  className="w-9 h-9 rounded-full border-2 border-gray-200"
-                  referrerPolicy="no-referrer"
-                />
+                <img src={user.photoURL} alt="Profile" className="w-9 h-9 rounded-xl border border-[var(--line)]" referrerPolicy="no-referrer" />
               ) : (
-                <div className="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-sm">
+                <div className="w-9 h-9 rounded-xl bg-teal-800 text-white flex items-center justify-center font-semibold text-sm">
                   {initials}
                 </div>
               )}
-              <ChevronDown className={cn('w-4 h-4 text-gray-400 transition-transform', profileOpen && 'rotate-180')} />
+              <ChevronDown className={cn('w-4 h-4 text-slate-400 transition-transform', profileOpen && 'rotate-180')} />
             </button>
 
-            {/* Dropdown Menu */}
             <AnimatePresence>
               {profileOpen && (
                 <motion.div
-                  className="glass-panel absolute right-0 top-full mt-2 w-64 rounded-xl shadow-lg border border-gray-200 overflow-hidden z-50"
+                  className="absolute right-0 top-full mt-2 w-64 rounded-2xl border border-[var(--line)] bg-white/95 backdrop-blur-xl shadow-xl overflow-hidden z-50"
                   initial="initial"
                   animate="animate"
                   exit="exit"
                   variants={scaleIn}
                   style={{ transformOrigin: 'top right' }}
                 >
-                {/* User Info Header */}
-                <div className="p-4 bg-indigo-50 border-b border-indigo-100">
-                  <div className="flex items-center gap-3">
-                    {user?.photoURL ? (
-                      <img src={user.photoURL} alt="Profile" className="w-10 h-10 rounded-full border-2 border-white shadow" referrerPolicy="no-referrer" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold">
-                        {initials}
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-gray-900 truncate">
-                        {user?.displayName || 'User'}
-                      </p>
-                      <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-                    </div>
+                  <div className="p-4 border-b border-[var(--line)] bg-gradient-to-br from-teal-50 to-white">
+                    <p className="text-sm font-semibold text-[var(--ink)] truncate">{user?.displayName || 'User'}</p>
+                    <p className="text-xs text-slate-500 truncate">{user?.email}</p>
                   </div>
-                </div>
-
-                {/* Menu Items */}
-                <div className="p-2">
-                  <Link
-                    to="/settings"
-                    onClick={() => setProfileOpen(false)}
-                    className="hover-lift flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
-                  >
-                    <User className="w-4 h-4 text-gray-500" />
-                    Profile & Settings
-                  </Link>
-                  <Link
-                    to="/settings"
-                    onClick={() => setProfileOpen(false)}
-                    className="hover-lift flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
-                  >
-                    <KeyRound className="w-4 h-4 text-gray-500" />
-                    Change Password
-                  </Link>
-                </div>
-
-                <div className="p-2 border-t border-gray-100">
-                  <button
-                    onClick={handleLogout}
-                    className="hover-lift flex items-center gap-3 px-3 py-2.5 text-sm text-red-600 rounded-lg hover:bg-red-50 transition-colors w-full"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    Sign Out
-                  </button>
-                </div>
-              </motion.div>
+                  <div className="p-2">
+                    <Link to="/settings" onClick={() => setProfileOpen(false)} className="flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 rounded-xl hover:bg-slate-50">
+                      <User className="w-4 h-4 text-slate-500" />
+                      Profile & Settings
+                    </Link>
+                    <Link to="/settings" onClick={() => setProfileOpen(false)} className="flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 rounded-xl hover:bg-slate-50">
+                      <KeyRound className="w-4 h-4 text-slate-500" />
+                      Change Password
+                    </Link>
+                  </div>
+                  <div className="p-2 border-t border-[var(--line)]">
+                    <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2.5 text-sm text-rose-700 rounded-xl hover:bg-rose-50 w-full">
+                      <LogOut className="w-4 h-4" />
+                      Sign Out
+                    </button>
+                  </div>
+                </motion.div>
               )}
             </AnimatePresence>
           </div>
         </header>
 
-        <div className="p-8">
-          {children}
-        </div>
+        <div className="p-6 md:p-8">{children}</div>
       </main>
     </div>
   );

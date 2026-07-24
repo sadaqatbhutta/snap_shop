@@ -9,7 +9,7 @@ import { cn } from '../lib/utils';
 import { useBusiness } from '../context/BusinessContext';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
-import { collection, query, orderBy, onSnapshot, getDocs, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, limit } from 'firebase/firestore';
 import { Customer } from '../../../shared/types';
 import { staggerContainer, staggerItem, fadeUp, scaleIn } from '../lib/animations';
 import { TableSkeleton } from '../components/Skeleton';
@@ -53,19 +53,20 @@ export default function CRM() {
     const customersQuery = query(
       collection(db, `businesses/${businessId}/customers`),
       orderBy('lastInteractionAt', 'desc'),
+      limit(200),
     );
-    const unsubs: Array<() => void> = [];
 
-    void (async () => {
-      try {
-        const snap = await getDocs(customersQuery);
+    const unsub = onSnapshot(
+      customersQuery,
+      snap => {
         if (cancelled) return;
         window.clearTimeout(timeout);
         setCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Customer)));
         setLoading(false);
-      } catch (err) {
+      },
+      err => {
         if (cancelled) return;
-        console.error('CRM initial load failed:', err);
+        console.error('CRM listener failed:', err);
         window.clearTimeout(timeout);
         setLoadError(
           err instanceof Error
@@ -73,28 +74,13 @@ export default function CRM() {
             : 'Could not load CRM data. Please refresh and try again.',
         );
         setLoading(false);
-        return;
-      }
-
-      if (cancelled) return;
-
-      unsubs.push(
-        onSnapshot(
-          customersQuery,
-          snap => {
-            setCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Customer)));
-          },
-          err => {
-            console.error('CRM listener failed:', err);
-          },
-        ),
-      );
-    })();
+      },
+    );
 
     return () => {
       cancelled = true;
       window.clearTimeout(timeout);
-      unsubs.forEach(u => u());
+      unsub();
     };
   }, [businessId]);
 
@@ -167,7 +153,7 @@ export default function CRM() {
 
   const SortIcon = ({ column }: { column: keyof Customer }) => {
     if (sortConfig.key !== column) return <ArrowUpDown className="w-3 h-3 ml-1 text-gray-400" />;
-    return sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1 text-indigo-600" /> : <ChevronDown className="w-3 h-3 ml-1 text-indigo-600" />;
+    return sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1 text-teal-700" /> : <ChevronDown className="w-3 h-3 ml-1 text-teal-700" />;
   };
 
   if (loading) return <TableSkeleton rows={8} />;
@@ -192,14 +178,14 @@ export default function CRM() {
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input type="text" placeholder="Search customers..." value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="glass-panel w-full pl-10 pr-4 py-2 bg-white/80 border border-gray-200/80 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+              className="glass-panel w-full pl-10 pr-4 py-2 bg-white/80 border border-gray-200/80 rounded-lg text-sm focus:ring-2 focus:ring-teal-600 outline-none" />
           </div>
           {/* Filter dropdown */}
           <div className="relative" onClick={e => e.stopPropagation()}>
             <button
               onClick={() => setShowFilterMenu(!showFilterMenu)}
               className={cn('flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-medium transition-colors',
-                filterChannel !== 'all' ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                filterChannel !== 'all' ? 'border-teal-300 bg-teal-50 text-teal-800' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
               )}
             >
               <Filter className="w-4 h-4" />
@@ -211,7 +197,7 @@ export default function CRM() {
                 {(['all', 'whatsapp', 'instagram', 'facebook', 'tiktok', 'webchat'] as FilterChannel[]).map(ch => (
                   <button key={ch} onClick={() => { setFilterChannel(ch); setShowFilterMenu(false); }}
                     className={cn('w-full text-left px-4 py-2.5 text-sm capitalize hover:bg-gray-50 transition-colors',
-                      filterChannel === ch ? 'text-indigo-600 font-semibold bg-indigo-50' : 'text-gray-700'
+                      filterChannel === ch ? 'text-teal-700 font-semibold bg-teal-50' : 'text-gray-700'
                     )}>
                     {ch === 'all' ? 'All Channels' : ch}
                   </button>
@@ -268,7 +254,7 @@ export default function CRM() {
                 >
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-xs">
+                      <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center text-teal-800 font-bold text-xs">
                         {customer.name.charAt(0)}
                       </div>
                       <span className="text-sm font-medium text-gray-900">{customer.name}</span>
@@ -277,11 +263,11 @@ export default function CRM() {
                   <td className="px-6 py-4">
                     <div className="space-y-1">
                       {customer.email && (
-                        <a href={`mailto:${customer.email}`} onClick={e => e.stopPropagation()} className="flex items-center gap-2 text-xs text-indigo-600 hover:underline">
+                        <a href={`mailto:${customer.email}`} onClick={e => e.stopPropagation()} className="flex items-center gap-2 text-xs text-teal-700 hover:underline">
                           <Mail className="w-3 h-3" /> {customer.email}
                         </a>
                       )}
-                      <a href={`tel:${customer.phone || customer.externalId}`} onClick={e => e.stopPropagation()} className="flex items-center gap-2 text-xs text-indigo-600 hover:underline">
+                      <a href={`tel:${customer.phone || customer.externalId}`} onClick={e => e.stopPropagation()} className="flex items-center gap-2 text-xs text-teal-700 hover:underline">
                         <Phone className="w-3 h-3" /> {customer.phone || customer.externalId}
                       </a>
                     </div>
@@ -297,7 +283,7 @@ export default function CRM() {
                         <input autoFocus type="text" value={tagInput}
                           onChange={e => setTagInput(e.target.value)}
                           onKeyDown={e => e.key === 'Enter' && saveTags(customer.id)}
-                          className="w-full px-2 py-1 text-xs border border-indigo-300 rounded focus:ring-1 focus:ring-indigo-500 outline-none"
+                          className="w-full px-2 py-1 text-xs border border-teal-300 rounded focus:ring-1 focus:ring-teal-600 outline-none"
                           placeholder="Tag1, Tag2..." />
                         <button onClick={() => saveTags(customer.id)} className="text-green-600 hover:text-green-700"><Check className="w-4 h-4" /></button>
                         <button onClick={e => { e.stopPropagation(); setEditingTagsId(null); }} className="text-red-600 hover:text-red-700"><X className="w-4 h-4" /></button>
@@ -305,10 +291,10 @@ export default function CRM() {
                     ) : (
                       <div className="flex flex-wrap gap-1 items-center">
                         {customer.tags.map(tag => (
-                          <span key={tag} className="inline-flex items-center px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full text-[10px] font-medium border border-indigo-100">{tag}</span>
+                          <span key={tag} className="inline-flex items-center px-2 py-0.5 bg-teal-50 text-teal-800 rounded-full text-[10px] font-medium border border-teal-100">{tag}</span>
                         ))}
                         <button onClick={e => { e.stopPropagation(); setEditingTagsId(customer.id); setTagInput(customer.tags.join(', ')); }}
-                          className="p-1 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                          className="p-1 text-gray-400 hover:text-teal-700 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Edit2 className="w-3 h-3" />
                         </button>
                       </div>
@@ -327,7 +313,7 @@ export default function CRM() {
                         <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-20 w-44 overflow-hidden">
                           <button onClick={() => { navigate('/conversations'); setMenuOpenId(null); }}
                             className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
-                            <MessageSquare className="w-4 h-4 text-indigo-500" /> View Conversations
+                            <MessageSquare className="w-4 h-4 text-teal-600" /> View Conversations
                           </button>
                           <button onClick={() => { setSelectedCustomer(customer); setNotesInput(customer.notes || ''); setEditingNotes(true); setMenuOpenId(null); }}
                             className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
@@ -362,18 +348,18 @@ export default function CRM() {
             >
             <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-indigo-600 flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-indigo-200">
+                <div className="w-14 h-14 rounded-2xl bg-teal-700 flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-teal-200">
                   {selectedCustomer.name.charAt(0)}
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-gray-900">{selectedCustomer.name}</h2>
                   <div className="flex items-center gap-3 mt-1 text-sm">
                     {selectedCustomer.email && (
-                      <a href={`mailto:${selectedCustomer.email}`} className="flex items-center gap-1 text-indigo-600 hover:underline">
+                      <a href={`mailto:${selectedCustomer.email}`} className="flex items-center gap-1 text-teal-700 hover:underline">
                         <Mail className="w-3 h-3" /> {selectedCustomer.email}
                       </a>
                     )}
-                    <a href={`tel:${selectedCustomer.phone || selectedCustomer.externalId}`} className="flex items-center gap-1 text-indigo-600 hover:underline">
+                    <a href={`tel:${selectedCustomer.phone || selectedCustomer.externalId}`} className="flex items-center gap-1 text-teal-700 hover:underline">
                       <Phone className="w-3 h-3" /> {selectedCustomer.phone || selectedCustomer.externalId}
                     </a>
                   </div>
@@ -389,7 +375,7 @@ export default function CRM() {
                 {/* Quick Actions */}
                 <div className="flex flex-wrap gap-3">
                   <button onClick={() => navigate('/conversations')}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition-all">
+                    className="flex items-center gap-2 px-4 py-2 bg-teal-700 text-white rounded-lg text-sm font-bold hover:bg-teal-800 transition-all">
                     <MessageSquare className="w-4 h-4" /> View Conversations
                   </button>
                   <button onClick={() => { setEditingTagsId(selectedCustomer.id); setTagInput(selectedCustomer.tags.join(', ')); setSelectedCustomer(null); }}
@@ -402,11 +388,11 @@ export default function CRM() {
                 <section className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-gray-900 font-bold">
-                      <FileText className="w-5 h-5 text-indigo-600" />
+                      <FileText className="w-5 h-5 text-teal-700" />
                       <h3>Internal Notes</h3>
                     </div>
                     {!editingNotes && (
-                      <button onClick={() => setEditingNotes(true)} className="text-xs text-indigo-600 hover:underline flex items-center gap-1">
+                      <button onClick={() => setEditingNotes(true)} className="text-xs text-teal-700 hover:underline flex items-center gap-1">
                         <Edit2 className="w-3 h-3" /> Edit
                       </button>
                     )}
@@ -414,10 +400,10 @@ export default function CRM() {
                   {editingNotes ? (
                     <div className="space-y-2">
                       <textarea rows={4} value={notesInput} onChange={e => setNotesInput(e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-teal-600 outline-none resize-none"
                         placeholder="Add internal notes about this customer..." />
                       <div className="flex gap-2">
-                        <button onClick={saveNotes} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700">Save Notes</button>
+                        <button onClick={saveNotes} className="px-4 py-2 bg-teal-700 text-white rounded-lg text-sm font-bold hover:bg-teal-800">Save Notes</button>
                         <button onClick={() => setEditingNotes(false)} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-bold hover:bg-gray-200">Cancel</button>
                       </div>
                     </div>
@@ -430,22 +416,22 @@ export default function CRM() {
               </div>
 
               <div className="space-y-6">
-                <div className="bg-indigo-50 p-5 rounded-2xl border border-indigo-100 space-y-3">
-                  <h4 className="text-sm font-bold text-indigo-900 uppercase tracking-wider">Customer Info</h4>
+                <div className="bg-teal-50 p-5 rounded-2xl border border-teal-100 space-y-3">
+                  <h4 className="text-sm font-bold text-teal-900 uppercase tracking-wider">Customer Info</h4>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-indigo-600 font-medium">Channel</span>
-                      <span className="font-bold text-indigo-900 capitalize">{selectedCustomer.channel}</span>
+                      <span className="text-teal-700 font-medium">Channel</span>
+                      <span className="font-bold text-teal-900 capitalize">{selectedCustomer.channel}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-indigo-600 font-medium">Since</span>
-                      <span className="font-bold text-indigo-900">{new Date(selectedCustomer.createdAt).toLocaleDateString()}</span>
+                      <span className="text-teal-700 font-medium">Since</span>
+                      <span className="font-bold text-teal-900">{new Date(selectedCustomer.createdAt).toLocaleDateString()}</span>
                     </div>
                     <div className="pt-2">
-                      <span className="text-xs font-bold text-indigo-600 uppercase block mb-2">Tags</span>
+                      <span className="text-xs font-bold text-teal-700 uppercase block mb-2">Tags</span>
                       <div className="flex flex-wrap gap-1">
                         {selectedCustomer.tags.map(tag => (
-                          <span key={tag} className="px-2 py-0.5 bg-white text-indigo-600 rounded-full text-[10px] font-bold border border-indigo-200">{tag}</span>
+                          <span key={tag} className="px-2 py-0.5 bg-white text-teal-700 rounded-full text-[10px] font-bold border border-teal-200">{tag}</span>
                         ))}
                         {selectedCustomer.tags.length === 0 && <span className="text-xs text-gray-400">No tags</span>}
                       </div>

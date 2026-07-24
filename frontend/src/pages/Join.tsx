@@ -59,10 +59,10 @@ export default function Join() {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="max-w-md w-full glass-panel glow-border bg-white/80 p-10 rounded-3xl shadow-xl shadow-indigo-100/50 border border-gray-100 text-center space-y-6"
+        className="max-w-md w-full glass-panel glow-border bg-white/80 p-10 rounded-3xl shadow-xl shadow-teal-100/50 border border-gray-100 text-center space-y-6"
       >
         <div className="flex justify-center">
-          <div className="p-4 bg-indigo-600 rounded-2xl text-white shadow-lg">
+          <div className="p-4 bg-teal-700 rounded-2xl text-white shadow-lg">
             <Bot className="w-10 h-10" />
           </div>
         </div>
@@ -72,7 +72,7 @@ export default function Join() {
             <AlertCircle className="w-10 h-10 text-orange-500 mx-auto" />
             <h1 className="text-2xl font-black text-gray-900">Sign in Required</h1>
             <p className="text-gray-500">You must be signed in to accept an invitation. Please log in then follow the link again.</p>
-            <button onClick={() => navigate('/')} className="hover-lift w-full py-4 bg-indigo-600 text-white rounded-2xl font-black hover:bg-indigo-700 transition-all">
+            <button onClick={() => navigate('/')} className="hover-lift w-full py-4 bg-teal-700 text-white rounded-2xl font-black hover:bg-teal-800 transition-all">
               Go to Login
             </button>
           </div>
@@ -101,7 +101,7 @@ export default function Join() {
 
         <div className="pt-6 border-t border-gray-50">
           <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest flex items-center justify-center gap-1">
-            <Sparkles className="w-3 h-3 text-indigo-400" /> Powered by SnapShop AI
+            <Sparkles className="w-3 h-3 text-teal-500" /> Powered by SnapShop AI
           </p>
         </div>
       </motion.div>

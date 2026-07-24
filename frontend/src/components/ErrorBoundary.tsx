@@ -58,7 +58,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
             <p className="text-sm text-gray-600">{errorMessage}</p>
             <button 
               onClick={() => window.location.reload()}
-              className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+              className="px-6 py-2 bg-teal-700 text-white rounded-lg font-medium hover:bg-teal-800 transition-colors"
             >
               Reload Application
             </button>

@@ -7,7 +7,7 @@ import { cn } from '../lib/utils';
 import { useBusiness } from '../context/BusinessContext';
 import { db } from '../firebase';
 import {
-  collection, query, orderBy, onSnapshot, updateDoc, doc, limit, arrayUnion, getDocs,
+  collection, query, orderBy, onSnapshot, updateDoc, doc, limit, limitToLast, arrayUnion, getDocs,
 } from 'firebase/firestore';
 import { Conversation, Message, InternalNote } from '../../../shared/types';
 import { auth } from '../firebase';
@@ -84,18 +84,18 @@ export default function Conversations() {
       orderBy('updatedAt', 'desc'),
       limit(50),
     );
-    const unsubs: Array<() => void> = [];
 
-    void (async () => {
-      try {
-        const snap = await getDocs(conversationsQuery);
+    const unsub = onSnapshot(
+      conversationsQuery,
+      snap => {
         if (cancelled) return;
         window.clearTimeout(timeout);
         setConversations(snap.docs.map(d => ({ id: d.id, ...d.data() } as Conversation)));
         setLoading(false);
-      } catch (err) {
+      },
+      err => {
         if (cancelled) return;
-        console.error('Conversations initial load failed:', err);
+        console.error('Conversations listener failed:', err);
         window.clearTimeout(timeout);
         setLoadError(
           err instanceof Error
@@ -103,28 +103,13 @@ export default function Conversations() {
             : 'Could not load conversations. Please refresh and try again.',
         );
         setLoading(false);
-        return;
-      }
-
-      if (cancelled) return;
-
-      unsubs.push(
-        onSnapshot(
-          conversationsQuery,
-          snap => {
-            setConversations(snap.docs.map(d => ({ id: d.id, ...d.data() } as Conversation)));
-          },
-          err => {
-            console.error('Conversations listener failed:', err);
-          },
-        ),
-      );
-    })();
+      },
+    );
 
     return () => {
       cancelled = true;
       window.clearTimeout(timeout);
-      unsubs.forEach(u => u());
+      unsub();
     };
   }, [businessId]);
 
@@ -136,7 +121,8 @@ export default function Conversations() {
     }
     const q = query(
       collection(db, `businesses/${businessId}/conversations/${selectedId}/messages`),
-      orderBy('timestamp', 'asc')
+      orderBy('timestamp', 'asc'),
+      limitToLast(200),
     );
     return onSnapshot(q, snap => {
       setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() } as Message)));
@@ -336,7 +322,7 @@ export default function Conversations() {
   }
 
   return (
-    <div className="glass-panel glow-border flex h-[calc(100vh-160px)] rounded-xl border border-gray-200/80 overflow-hidden shadow-sm">
+    <div className="surface-card flex h-[calc(100vh-160px)] overflow-hidden">
       {/* ─── Conversation List ─── */}
       <div className="w-80 border-r border-gray-200/70 flex flex-col bg-gray-50/30">
         <div className="p-4 border-b border-gray-200 space-y-3 bg-white">
@@ -347,7 +333,7 @@ export default function Conversations() {
               placeholder="Search chats..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-gray-100 border-none rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+              className="w-full pl-10 pr-4 py-2 bg-gray-100 border-none rounded-lg text-sm focus:ring-2 focus:ring-teal-600 outline-none"
             />
           </div>
           <div className="flex flex-col gap-2">
@@ -395,7 +381,7 @@ export default function Conversations() {
             <button
               type="button"
               onClick={() => void exportConversationsCsv()}
-              className="flex items-center justify-center gap-2 w-full py-2 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg hover:bg-indigo-100"
+              className="flex items-center justify-center gap-2 w-full py-2 text-xs font-semibold text-teal-800 bg-teal-50 border border-teal-100 rounded-lg hover:bg-teal-100"
             >
               <Download className="w-3.5 h-3.5" /> Export CRM (CSV)
             </button>
@@ -416,7 +402,7 @@ export default function Conversations() {
                 onClick={() => setSelectedId(chat.id)}
                 className={cn(
                   'p-4 cursor-pointer transition-all border-l-4 relative hover-lift',
-                  selectedId === chat.id ? 'bg-indigo-50 border-indigo-600' : 'border-transparent hover:bg-gray-50'
+                  selectedId === chat.id ? 'bg-teal-50 border-teal-700' : 'border-transparent hover:bg-gray-50'
                 )}
                 whileHover={{ x: 4, scale: 1.01 }}
                 whileTap={{ scale: 0.99 }}
@@ -448,7 +434,7 @@ export default function Conversations() {
                       <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 uppercase">Hot</span>
                     )}
                     {chat.needsHumanReview && (
-                      <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-violet-100 text-violet-800 uppercase">Review</span>
+                      <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-teal-100 text-teal-900 uppercase">Review</span>
                     )}
                     <div className={cn(
                       'text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-tighter',
@@ -480,7 +466,7 @@ export default function Conversations() {
           {/* Header */}
           <div className="px-6 py-4 border-b border-gray-200/70 flex items-center justify-between bg-white/85 backdrop-blur-sm z-10">
             <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-sm">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-600 to-teal-700 flex items-center justify-center text-white font-bold shadow-sm">
                 {selected.customerName?.charAt(0).toUpperCase() || '?'}
               </div>
               <div>
@@ -520,7 +506,7 @@ export default function Conversations() {
                 </button>
               )}
               <div className="mx-2 w-px h-6 bg-gray-200" />
-              <button onClick={() => setShowInfo(prev => !prev)} className="p-2 text-gray-400 hover:text-indigo-600 rounded-full hover:bg-gray-50" title="Information"><Info className="w-5 h-5" /></button>
+              <button onClick={() => setShowInfo(prev => !prev)} className="p-2 text-gray-400 hover:text-teal-700 rounded-full hover:bg-gray-50" title="Information"><Info className="w-5 h-5" /></button>
             </div>
           </div>
 
@@ -547,7 +533,7 @@ export default function Conversations() {
                   <div className={cn(
                     'w-8 h-8 rounded-full flex items-center justify-center text-white shrink-0 shadow-sm mt-1',
                     !isFirstInGroup && 'invisible',
-                    msg.senderType === 'customer' ? 'bg-gray-400' : msg.senderType === 'ai' ? 'bg-indigo-600' : 'bg-emerald-600'
+                    msg.senderType === 'customer' ? 'bg-gray-400' : msg.senderType === 'ai' ? 'bg-teal-700' : 'bg-emerald-600'
                   )}>
                     {msg.senderType === 'customer' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
                   </div>
@@ -560,7 +546,7 @@ export default function Conversations() {
                       msg.senderType === 'customer'
                         ? 'bg-white text-gray-800 rounded-tl-none border border-gray-100 hover:border-gray-200'
                         : msg.senderType === 'ai' 
-                          ? 'bg-indigo-600 text-white rounded-tr-none'
+                          ? 'bg-teal-700 text-white rounded-tr-none'
                           : 'bg-emerald-600 text-white rounded-tr-none'
                     )}>
                       <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -589,7 +575,7 @@ export default function Conversations() {
                 <p className="text-sm text-gray-500 font-medium italic">Conversation is closed. Re-open to send messages.</p>
                 <button 
                   onClick={() => updateStatus('active')}
-                  className="mt-2 text-xs font-bold text-indigo-600 hover:underline"
+                  className="mt-2 text-xs font-bold text-teal-700 hover:underline"
                 >
                   Restore Conversation
                 </button>
@@ -619,7 +605,7 @@ export default function Conversations() {
                       type="button"
                       onClick={handleSuggestReply}
                       disabled={suggestingReply}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg hover:bg-indigo-100 disabled:opacity-60"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-teal-800 bg-teal-50 border border-teal-100 rounded-lg hover:bg-teal-100 disabled:opacity-60"
                     >
                       {suggestingReply ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
                       AI Suggest Reply
@@ -636,14 +622,14 @@ export default function Conversations() {
                       }
                     }}
                     placeholder={selected.status === 'human_escalated' ? "Reply as agent..." : "Type agent follow-up..."}
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none resize-none placeholder:text-gray-400 shadow-inner"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-600 focus:bg-white transition-all outline-none resize-none placeholder:text-gray-400 shadow-inner"
                   />
                   <div className="absolute right-3 bottom-3 flex items-center gap-2">
                     <span className="text-[10px] text-gray-400 group-focus-within:opacity-100 opacity-0 transition-opacity">Press Enter to send</span>
                     <motion.button
                       type="submit"
                       disabled={sending || !input.trim()}
-                      className="p-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md disabled:bg-gray-300 disabled:shadow-none"
+                      className="p-2.5 bg-teal-700 text-white rounded-lg hover:bg-teal-800 shadow-md disabled:bg-gray-300 disabled:shadow-none"
                       whileTap={{ scale: 0.88, rotate: 10 }}
                       transition={{ type: 'spring', stiffness: 500, damping: 20 }}
                     >
@@ -673,7 +659,7 @@ export default function Conversations() {
                   type="button"
                   onClick={() => void handleSummarizeThread()}
                   disabled={summarizing}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-violet-600 text-white text-[10px] font-bold hover:bg-violet-700 disabled:opacity-60"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-teal-700 text-white text-[10px] font-bold hover:bg-teal-800 disabled:opacity-60"
                 >
                   {summarizing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
                   Summarize

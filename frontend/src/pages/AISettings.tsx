@@ -59,8 +59,8 @@ export default function AISettings() {
       <motion.div className="glass-panel glow-border p-8 rounded-xl border border-gray-200/80 shadow-sm space-y-6" variants={staggerItem}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-50 rounded-lg">
-              <Bot className="w-6 h-6 text-indigo-600" />
+            <div className="p-2 bg-teal-50 rounded-lg">
+              <Bot className="w-6 h-6 text-teal-700" />
             </div>
             <div>
               <h3 className="text-lg font-semibold text-gray-900">AI Personality & Context</h3>
@@ -70,7 +70,7 @@ export default function AISettings() {
           <motion.button
             onClick={handleSave}
             disabled={saving}
-            className="hover-lift flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-60"
+            className="hover-lift flex items-center gap-2 px-4 py-2 bg-teal-700 text-white rounded-lg font-medium hover:bg-teal-800 transition-colors disabled:opacity-60"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.97 }}
             transition={{ duration: 0.15 }}
@@ -86,7 +86,7 @@ export default function AISettings() {
             value={businessContext}
             onChange={e => setBusinessContext(e.target.value)}
             rows={5}
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none"
+            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-600 focus:bg-white transition-all outline-none"
             placeholder="Describe your business, products, and services..."
           />
           <div className="flex items-start gap-2 text-xs text-gray-500 bg-blue-50 p-3 rounded-lg border border-blue-100">
@@ -98,8 +98,8 @@ export default function AISettings() {
 
       <motion.div className="glass-panel glow-border p-8 rounded-xl border border-gray-200/80 shadow-sm space-y-6" variants={staggerItem}>
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-indigo-50 rounded-lg">
-            <Plus className="w-6 h-6 text-indigo-600" />
+          <div className="p-2 bg-teal-50 rounded-lg">
+            <Plus className="w-6 h-6 text-teal-700" />
           </div>
           <div>
             <h3 className="text-lg font-semibold text-gray-900">Frequently Asked Questions (FAQs)</h3>
@@ -115,7 +115,7 @@ export default function AISettings() {
               onChange={e => setNewFaq(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && addFaq()}
               placeholder="e.g., What are your store timings? - We are open from 10 AM to 10 PM."
-              className="flex-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none"
+              className="flex-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-600 focus:bg-white transition-all outline-none"
             />
             <button onClick={addFaq} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors">
               Add FAQ
@@ -148,7 +148,7 @@ export default function AISettings() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">Confidence Threshold</span>
-              <span className="text-sm font-bold text-indigo-600">{threshold}%</span>
+              <span className="text-sm font-bold text-teal-700">{threshold}%</span>
             </div>
             <input
               type="range"
@@ -156,7 +156,7 @@ export default function AISettings() {
               max={95}
               value={threshold}
               onChange={e => setThreshold(Number(e.target.value))}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-teal-700"
             />
             <p className="text-xs text-gray-400">AI will escalate to a human if its confidence falls below this level.</p>
           </div>
@@ -172,7 +172,7 @@ export default function AISettings() {
             {['whatsapp', 'instagram', 'facebook', 'webchat'].map(ch => (
               <div key={ch} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
                 <span className="text-xs font-medium text-gray-600 capitalize">{ch}</span>
-                <code className="text-[10px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
+                <code className="text-[10px] text-teal-700 bg-teal-50 px-2 py-0.5 rounded">
                   POST /api/webhook/{ch}
                 </code>
               </div>

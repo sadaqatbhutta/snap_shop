@@ -9,7 +9,7 @@ import { cn } from '../lib/utils';
 import { Link } from 'react-router-dom';
 import { useBusiness } from '../context/BusinessContext';
 import { db, auth } from '../firebase';
-import { collection, query, orderBy, onSnapshot, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, limit } from 'firebase/firestore';
 import { Broadcast, Template, Segment } from '../../../shared/types';
 import { staggerContainer, staggerItem, fadeUp, scaleIn } from '../lib/animations';
 import { TableSkeleton } from '../components/Skeleton';
@@ -49,62 +49,50 @@ export default function Broadcasts() {
     const broadcastsQuery = query(
       collection(db, `businesses/${businessId}/broadcasts`),
       orderBy('createdAt', 'desc'),
+      limit(100),
     );
-    const templatesCol = collection(db, `businesses/${businessId}/templates`);
-    const segmentsCol = collection(db, `businesses/${businessId}/segments`);
+    const templatesCol = query(collection(db, `businesses/${businessId}/templates`), limit(100));
+    const segmentsCol = query(collection(db, `businesses/${businessId}/segments`), limit(100));
 
-    const unsubs: Array<() => void> = [];
-
-    void (async () => {
-      try {
-        const [bSnap, tSnap, sSnap] = await Promise.all([
-          getDocs(broadcastsQuery),
-          getDocs(templatesCol),
-          getDocs(segmentsCol),
-        ]);
-        if (cancelled) return;
+    let pending = 3;
+    const markReady = () => {
+      if (pending <= 0) return;
+      pending -= 1;
+      if (pending <= 0 && !cancelled) {
         window.clearTimeout(timeout);
-        setBroadcasts(bSnap.docs.map(d => ({ id: d.id, ...d.data() } as Broadcast)));
-        setTemplates(tSnap.docs.map(d => ({ id: d.id, ...d.data() } as Template)));
-        setSegments(sSnap.docs.map(d => ({ id: d.id, ...d.data() } as Segment)));
         setLoading(false);
-      } catch (err) {
-        if (cancelled) return;
-        console.error('Broadcasts initial load failed:', err);
-        window.clearTimeout(timeout);
-        setLoadError(
-          err instanceof Error
-            ? err.message
-            : 'Could not load broadcasts. Please refresh and try again.',
-        );
-        setLoading(false);
-        return;
       }
+    };
 
-      if (cancelled) return;
-
-      unsubs.push(
-        onSnapshot(broadcastsQuery, snap => {
-          setBroadcasts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Broadcast)));
-        }, err => {
-          console.error('Broadcasts listener failed:', err);
-        }),
-      );
-      unsubs.push(
-        onSnapshot(templatesCol, snap => {
-          setTemplates(snap.docs.map(d => ({ id: d.id, ...d.data() } as Template)));
-        }, err => {
-          console.error('Templates listener failed:', err);
-        }),
-      );
-      unsubs.push(
-        onSnapshot(segmentsCol, snap => {
-          setSegments(snap.docs.map(d => ({ id: d.id, ...d.data() } as Segment)));
-        }, err => {
-          console.error('Segments listener failed:', err);
-        }),
-      );
-    })();
+    const unsubs = [
+      onSnapshot(broadcastsQuery, snap => {
+        if (cancelled) return;
+        setBroadcasts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Broadcast)));
+        markReady();
+      }, err => {
+        console.error('Broadcasts listener failed:', err);
+        if (!cancelled) {
+          setLoadError(err instanceof Error ? err.message : 'Could not load broadcasts.');
+          markReady();
+        }
+      }),
+      onSnapshot(templatesCol, snap => {
+        if (cancelled) return;
+        setTemplates(snap.docs.map(d => ({ id: d.id, ...d.data() } as Template)));
+        markReady();
+      }, err => {
+        console.error('Templates listener failed:', err);
+        markReady();
+      }),
+      onSnapshot(segmentsCol, snap => {
+        if (cancelled) return;
+        setSegments(snap.docs.map(d => ({ id: d.id, ...d.data() } as Segment)));
+        markReady();
+      }, err => {
+        console.error('Segments listener failed:', err);
+        markReady();
+      }),
+    ];
 
     return () => {
       cancelled = true;
@@ -257,12 +245,12 @@ export default function Broadcasts() {
         </div>
         <div className="flex gap-3">
           <Link to="/segments" className="hover-lift flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all">
-            <Users className="w-4 h-4 text-indigo-500" /> Segments
+            <Users className="w-4 h-4 text-teal-600" /> Segments
           </Link>
           <Link to="/templates" className="hover-lift flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all">
-            <FileText className="w-4 h-4 text-indigo-500" /> Templates
+            <FileText className="w-4 h-4 text-teal-600" /> Templates
           </Link>
-          <button onClick={() => setIsModalOpen(true)} className="hover-lift flex items-center gap-2 px-6 py-2 text-sm font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all">
+          <button onClick={() => setIsModalOpen(true)} className="hover-lift flex items-center gap-2 px-6 py-2 text-sm font-bold text-white bg-teal-700 rounded-lg hover:bg-teal-800 shadow-lg shadow-teal-200 transition-all">
             <Plus className="w-4 h-4" /> New Broadcast
           </button>
         </div>
@@ -270,7 +258,7 @@ export default function Broadcasts() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
-          { label: 'Total Broadcasts', value: broadcasts.length, icon: Megaphone, bg: 'bg-indigo-50', color: 'text-indigo-600' },
+          { label: 'Total Broadcasts', value: broadcasts.length, icon: Megaphone, bg: 'bg-teal-50', color: 'text-teal-700' },
           { label: 'Messages Sent', value: broadcasts.filter(b => b.status === 'sent').reduce((a, b) => a + (b.reach || 0), 0).toLocaleString(), icon: CheckCircle2, bg: 'bg-green-50', color: 'text-green-600' },
           { label: 'Scheduled', value: broadcasts.filter(b => b.status === 'scheduled').length, icon: TrendingUp, bg: 'bg-orange-50', color: 'text-orange-600' },
         ].map(s => (
@@ -296,7 +284,7 @@ export default function Broadcasts() {
               onClick={() => setActiveTab(tab)}
               className={cn(
                 'px-6 py-2 text-xs font-bold rounded-lg capitalize transition-all',
-                activeTab === tab ? 'bg-white text-indigo-600 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-600'
+                activeTab === tab ? 'bg-white text-teal-700 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-600'
               )}
             >
               {tab}
@@ -334,21 +322,21 @@ export default function Broadcasts() {
               {filtered.map(bc => (
                 <motion.tr
                   key={bc.id}
-                  className="group hover:bg-indigo-50/20 transition-all hover-lift"
+                  className="group hover:bg-teal-50/20 transition-all hover-lift"
                   variants={staggerItem}
                   whileHover={{ backgroundColor: 'rgba(99,102,241,0.04)' }}
                   whileTap={{ scale: 0.995 }}
                 >
                   <td className="px-6 py-5">
                     <div className="flex flex-col">
-                      <span className="text-sm font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">{bc.name}</span>
+                      <span className="text-sm font-bold text-gray-900 group-hover:text-teal-700 transition-colors">{bc.name}</span>
                       <span className="text-[10px] text-gray-400 font-mono">ID: {bc.id.slice(0, 8)}</span>
                     </div>
                   </td>
                   <td className="px-6 py-5">
                     <div className="flex flex-col gap-1.5">
                       <div className="flex items-center gap-1.5 px-2 py-0.5 bg-gray-50 rounded border border-gray-100 w-fit">
-                        <FileText className="w-3 h-3 text-indigo-400" />
+                        <FileText className="w-3 h-3 text-teal-500" />
                         <span className="text-[11px] font-bold text-gray-600">{bc.templateName || 'Untitled Template'}</span>
                       </div>
                       <div className="flex items-center gap-1.5 px-2 py-0.5 bg-gray-50 rounded border border-gray-100 w-fit">
@@ -361,7 +349,7 @@ export default function Broadcasts() {
                     <span className={cn(
                       'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter shadow-sm',
                       bc.status === 'sent' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
-                      bc.status === 'scheduled' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' :
+                      bc.status === 'scheduled' ? 'bg-teal-50 text-teal-800 border border-teal-100' :
                       bc.status === 'failed' ? 'bg-red-50 text-red-700 border border-red-100' :
                       'bg-gray-100 text-gray-600 border border-gray-200'
                     )}>
@@ -380,7 +368,7 @@ export default function Broadcasts() {
                       </span>
                     </div>
                   </td>
-                  <td className="px-6 py-5 text-right font-black text-indigo-600 text-lg">
+                  <td className="px-6 py-5 text-right font-black text-teal-700 text-lg">
                     {bc.reach.toLocaleString()}
                   </td>
                   <td className="px-6 py-5 text-right">
@@ -388,7 +376,7 @@ export default function Broadcasts() {
                       {bc.status !== 'sent' && (
                         <button
                           onClick={() => handleSendNow(bc.id)}
-                          className="flex items-center gap-1.5 px-4 py-2 text-xs font-black bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 active:scale-95 transition-all shadow-md shadow-indigo-100"
+                          className="flex items-center gap-1.5 px-4 py-2 text-xs font-black bg-teal-700 text-white rounded-xl hover:bg-teal-800 active:scale-95 transition-all shadow-md shadow-teal-100"
                         >
                           <Send className="w-3.5 h-3.5" /> Send Now
                         </button>
@@ -420,7 +408,7 @@ export default function Broadcasts() {
               animate="animate"
               exit="exit"
             >
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-indigo-600 text-white">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-teal-700 text-white">
               <h2 className="text-xl font-bold flex items-center gap-2"><Megaphone className="w-5 h-5" /> New Broadcast</h2>
               <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white/20 rounded-full"><X className="w-5 h-5" /></button>
             </div>
@@ -433,13 +421,13 @@ export default function Broadcasts() {
                     placeholder="e.g. increase weekend orders by 20%"
                     value={campaignObjective}
                     onChange={e => setCampaignObjective(e.target.value)}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-600 outline-none text-sm"
                   />
                   <button
                     type="button"
                     onClick={handleGenerateCampaign}
                     disabled={generatingCampaign || !campaignObjective.trim()}
-                    className="px-3 py-2 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg hover:bg-indigo-100 disabled:opacity-60"
+                    className="px-3 py-2 text-xs font-semibold text-teal-800 bg-teal-50 border border-teal-100 rounded-lg hover:bg-teal-100 disabled:opacity-60"
                   >
                     {generatingCampaign ? 'Generating...' : 'AI Generate'}
                   </button>
@@ -449,12 +437,12 @@ export default function Broadcasts() {
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Broadcast Name</label>
                 <input required type="text" placeholder="e.g. Eid Special Offer" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm" />
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-600 outline-none text-sm" />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Template</label>
                 <select required value={form.templateId} onChange={e => setForm({ ...form, templateId: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white">
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-600 outline-none text-sm bg-white">
                   <option value="">Select a template...</option>
                   {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
@@ -463,7 +451,7 @@ export default function Broadcasts() {
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Segment</label>
                 <select required value={form.segmentId} onChange={e => setForm({ ...form, segmentId: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white">
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-600 outline-none text-sm bg-white">
                   <option value="">Select a segment...</option>
                   {segments.map(s => <option key={s.id} value={s.id}>{s.name} ({s.count})</option>)}
                 </select>
@@ -472,11 +460,11 @@ export default function Broadcasts() {
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Schedule (optional)</label>
                 <input type="datetime-local" value={form.scheduledAt} onChange={e => setForm({ ...form, scheduledAt: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm" />
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-600 outline-none text-sm" />
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancel</button>
-                <button type="submit" disabled={saving} className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-60 flex items-center justify-center gap-2">
+                <button type="submit" disabled={saving} className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-teal-700 rounded-lg hover:bg-teal-800 disabled:opacity-60 flex items-center justify-center gap-2">
                   {saving && <Loader2 className="w-4 h-4 animate-spin" />} Save Broadcast
                 </button>
               </div>

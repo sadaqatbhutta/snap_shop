@@ -1,15 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { MessageSquare, Users, TrendingUp, Clock, ArrowUpRight, Megaphone, ListChecks, CheckCircle2 } from 'lucide-react';
+import { MessageSquare, Users, TrendingUp, Clock, ArrowUpRight, Megaphone, ListChecks, CheckCircle2, Sparkles } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useBusiness } from '../context/BusinessContext';
 import type { OnboardingProgress } from '../../../shared/types';
 import { db } from '../firebase';
-import { collection, query, orderBy, limit, onSnapshot, getDocs, doc, updateDoc, where } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, getCountFromServer, doc, updateDoc, where } from 'firebase/firestore';
 import { Conversation, Broadcast } from '../../../shared/types';
 import { staggerContainer, staggerItem, fadeUp } from '../lib/animations';
 import { DashboardSkeleton } from '../components/Skeleton';
+
+async function countQuery(q: Parameters<typeof getCountFromServer>[0]) {
+  try {
+    return (await getCountFromServer(q)).data().count;
+  } catch {
+    return 0;
+  }
+}
 
 export default function Dashboard() {
   const { businessId, business, refreshBusiness } = useBusiness();
@@ -26,17 +34,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!businessId) return;
-    getDocs(collection(db, `businesses/${businessId}/conversations`))
-      .then(s => setConvTotal(s.size))
-      .catch(() => setConvTotal(0));
-    getDocs(collection(db, `businesses/${businessId}/agents`))
-      .then(s => setAgentTotal(s.size))
-      .catch(() => setAgentTotal(0));
-  }, [businessId]);
 
-  useEffect(() => {
-    if (!businessId) return;
-
+    let cancelled = false;
     setLoading(false);
 
     const recentConvUnsub = onSnapshot(
@@ -51,22 +50,31 @@ export default function Dashboard() {
       snap => setBroadcasts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Broadcast))),
     );
 
-    setTotalConversations(convTotal);
-    getDocs(query(collection(db, `businesses/${businessId}/conversations`), where('status', '==', 'active')))
-      .then(s => setTotalActiveChats(s.size))
-      .catch(() => setTotalActiveChats(0));
-    getDocs(query(collection(db, `businesses/${businessId}/broadcasts`), where('status', '==', 'sent')))
-      .then(s => setTotalBroadcastsSent(s.size))
-      .catch(() => setTotalBroadcastsSent(0));
-    getDocs(collection(db, `businesses/${businessId}/customers`))
-      .then(s => setCustomerCount(s.size))
-      .catch(() => setCustomerCount(0));
+    const conversationsCol = collection(db, `businesses/${businessId}/conversations`);
+    const broadcastsCol = collection(db, `businesses/${businessId}/broadcasts`);
+
+    void Promise.all([
+      countQuery(query(conversationsCol)),
+      countQuery(query(collection(db, `businesses/${businessId}/agents`))),
+      countQuery(query(conversationsCol, where('status', '==', 'active'))),
+      countQuery(query(broadcastsCol, where('status', '==', 'sent'))),
+      countQuery(query(collection(db, `businesses/${businessId}/customers`))),
+    ]).then(([convCount, agents, active, sent, customers]) => {
+      if (cancelled) return;
+      setConvTotal(convCount);
+      setTotalConversations(convCount);
+      setAgentTotal(agents);
+      setTotalActiveChats(active);
+      setTotalBroadcastsSent(sent);
+      setCustomerCount(customers);
+    });
 
     return () => {
+      cancelled = true;
       recentConvUnsub();
       bcUnsub();
     };
-  }, [businessId, convTotal]);
+  }, [businessId]);
 
   const activeCount = totalActiveChats;
 
@@ -100,10 +108,10 @@ export default function Dashboard() {
   };
 
   const stats = [
-    { label: 'Total Conversations', value: totalConversations.toString(), icon: MessageSquare, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-    { label: 'Active Customers', value: customerCount.toString(), icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { label: 'Active Chats', value: activeCount.toString(), icon: Clock, color: 'text-green-600', bg: 'bg-green-50' },
-    { label: 'Broadcasts Sent', value: totalBroadcastsSent.toString(), icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50' },
+    { label: 'Conversations', value: totalConversations.toString(), icon: MessageSquare },
+    { label: 'Customers', value: customerCount.toString(), icon: Users },
+    { label: 'Active chats', value: activeCount.toString(), icon: Clock },
+    { label: 'Broadcasts', value: totalBroadcastsSent.toString(), icon: TrendingUp },
   ];
 
   if (loading) {
@@ -112,38 +120,63 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
+      <motion.div
+        className="relative overflow-hidden rounded-[1.35rem] border border-[var(--line)] bg-[var(--ink)] text-white px-6 py-7 sm:px-8"
+        variants={fadeUp}
+        initial="initial"
+        animate="animate"
+      >
+        <div className="pointer-events-none absolute -right-10 -top-16 h-56 w-56 rounded-full bg-teal-400/25 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-20 left-10 h-48 w-48 rounded-full bg-slate-400/20 blur-3xl" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.22em] font-semibold text-teal-200/80">Workspace</p>
+            <h1 className="font-display text-4xl sm:text-5xl mt-2 leading-none">
+              {business?.name || 'SnapShop'}
+            </h1>
+            <p className="mt-3 max-w-xl text-sm text-slate-300 leading-relaxed">
+              Your AI inbox is live — replies, escalations, and campaigns in one calm surface.
+            </p>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-teal-100">
+            <Sparkles className="w-3.5 h-3.5" />
+            AI online · {activeCount} active
+          </div>
+        </div>
+      </motion.div>
+
       {!onboardingComplete && (
         <motion.div
-          className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-xl p-6 text-white shadow-lg glow-border"
+          className="surface-card p-6"
           variants={fadeUp}
           initial="initial"
           animate="animate"
         >
           <div className="flex items-start gap-4">
-            <div className="p-3 bg-white/15 rounded-xl shrink-0">
-              <ListChecks className="w-6 h-6" />
+            <div className="p-2.5 bg-teal-50 text-teal-800 rounded-xl shrink-0">
+              <ListChecks className="w-5 h-5" />
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="text-lg font-bold">Getting started</h2>
-              <p className="text-sm text-indigo-100 mt-1">Complete these steps to get the most from SnapShop.</p>
-              <ul className="mt-4 space-y-2">
+              <h2 className="font-display text-2xl text-[var(--ink)]">Getting started</h2>
+              <p className="text-sm text-slate-500 mt-1">A few steps to make SnapShop feel like your team.</p>
+              <ul className="mt-4 space-y-2.5">
                 {onboardingItems.map(item => (
                   <li key={item.label} className="flex items-center gap-3 text-sm">
                     {item.done ? (
-                      <CheckCircle2 className="w-5 h-5 text-emerald-300 shrink-0" />
+                      <CheckCircle2 className="w-5 h-5 text-teal-700 shrink-0" />
                     ) : (
-                      <span className="w-5 h-5 rounded-full border-2 border-white/50 shrink-0" />
+                      <span className="w-5 h-5 rounded-full border-2 border-slate-300 shrink-0" />
                     )}
-                    <Link to={item.href} className={cn('hover:underline font-medium', item.done ? 'text-indigo-100 line-through opacity-80' : '')}>
+                    <Link to={item.href} className={cn('hover:underline font-medium text-[var(--ink)]', item.done && 'text-slate-400 line-through')}>
                       {item.label}
                     </Link>
                     <button
                       type="button"
                       disabled={onboardingSavingKey === item.key}
                       onClick={() => void setOnboardingValue(item.key, !item.done)}
-                      className="ml-auto text-xs font-semibold bg-white/20 hover:bg-white/30 px-2 py-1 rounded-lg shrink-0 disabled:opacity-60"
+                      className="ml-auto text-xs font-semibold text-teal-800 bg-teal-50 hover:bg-teal-100 px-2.5 py-1 rounded-lg shrink-0 disabled:opacity-60"
                     >
-                      {onboardingSavingKey === item.key ? 'Saving...' : item.done ? 'Mark not done' : 'Mark done'}
+                      {onboardingSavingKey === item.key ? 'Saving…' : item.done ? 'Undo' : 'Done'}
                     </button>
                   </li>
                 ))}
@@ -154,7 +187,7 @@ export default function Dashboard() {
       )}
 
       <motion.div
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
         variants={staggerContainer}
         initial="initial"
         animate="animate"
@@ -162,120 +195,117 @@ export default function Dashboard() {
         {stats.map(stat => (
           <motion.div
             key={stat.label}
-            className="glass-panel hover-lift glow-border p-6 rounded-xl border border-gray-200/80 shadow-sm hover:shadow-md transition-shadow"
+            className="surface-card p-5 hover-lift"
             variants={staggerItem}
-            whileHover={{ y: -4, scale: 1.01 }}
+            whileHover={{ y: -3 }}
             transition={{ duration: 0.2 }}
           >
-            <div className="flex items-center justify-between mb-4">
-              <div className={cn('p-2 rounded-lg', stat.bg)}>
-                <stat.icon className={cn('w-6 h-6', stat.color)} />
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-2 rounded-lg bg-teal-50 text-teal-800">
+                <stat.icon className="w-5 h-5" />
               </div>
-              <ArrowUpRight className="w-4 h-4 text-green-500" />
+              <ArrowUpRight className="w-4 h-4 text-teal-700/70" />
             </div>
-            <h3 className="text-sm font-medium text-gray-500">{stat.label}</h3>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{stat.value}</p>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{stat.label}</h3>
+            <p className="font-display text-3xl text-[var(--ink)] mt-1">{stat.value}</p>
           </motion.div>
         ))}
       </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-8">
-          {/* Recent Conversations */}
-          <div className="glass-panel glow-border rounded-xl border border-gray-200/80 shadow-sm overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="surface-card overflow-hidden">
             <motion.div
-              className="p-6 border-b border-gray-200 flex items-center justify-between"
+              className="px-6 py-4 border-b border-[var(--line)] flex items-center justify-between"
               variants={fadeUp}
               initial="initial"
               animate="animate"
             >
-              <h3 className="font-semibold text-gray-800">Recent Conversations</h3>
-              <Link to="/conversations" className="text-sm text-indigo-600 font-medium hover:underline">View all</Link>
+              <h3 className="font-semibold text-[var(--ink)]">Recent conversations</h3>
+              <Link to="/conversations" className="text-sm text-teal-800 font-semibold hover:underline">View all</Link>
             </motion.div>
             <motion.div
-              className="divide-y divide-gray-100"
+              className="divide-y divide-[var(--line)]"
               variants={staggerContainer}
               initial="initial"
               animate="animate"
             >
               {conversations.length === 0 && (
-                <p className="p-6 text-sm text-gray-400 text-center">No conversations yet. Messages from your channels will appear here.</p>
+                <p className="p-6 text-sm text-slate-400 text-center">No conversations yet. Channel messages will appear here.</p>
               )}
               {conversations.map(conv => (
                 <motion.div key={conv.id} variants={staggerItem}>
                   <Link
                     to="/conversations"
-                    className="p-4 hover:bg-gray-50/80 transition-colors flex items-center justify-between cursor-pointer block hover-lift"
+                    className="p-4 hover:bg-teal-50/40 transition-colors flex items-center justify-between cursor-pointer block"
                   >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center font-bold text-indigo-700">
-                      {conv.customerName?.charAt(0) || '?'}
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center font-bold text-teal-800">
+                        {conv.customerName?.charAt(0) || '?'}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-[var(--ink)]">{conv.customerName || 'Unknown'}</p>
+                        <p className="text-xs text-slate-500 truncate max-w-[200px]">{conv.lastMessage}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{conv.customerName || 'Unknown'}</p>
-                      <p className="text-xs text-gray-500 truncate max-w-[200px]">{conv.lastMessage}</p>
+                    <div className="text-right">
+                      <p className="text-xs text-slate-400">
+                        {conv.updatedAt ? new Date(conv.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                      </p>
+                      <span className={cn(
+                        'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium mt-1',
+                        conv.status === 'active' ? 'bg-teal-50 text-teal-800' :
+                        conv.status === 'human_escalated' ? 'bg-amber-50 text-amber-800' :
+                        'bg-slate-100 text-slate-500'
+                      )}>
+                        {conv.status === 'human_escalated' ? 'Human' : conv.status}
+                      </span>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-400">
-                      {conv.updatedAt ? new Date(conv.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                    </p>
-                    <span className={cn(
-                      'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium mt-1',
-                      conv.status === 'active' ? 'bg-green-100 text-green-800' :
-                      conv.status === 'human_escalated' ? 'bg-orange-100 text-orange-700' :
-                      'bg-gray-100 text-gray-500'
-                    )}>
-                      {conv.status === 'human_escalated' ? 'Human' : conv.status}
-                    </span>
-                  </div>
                   </Link>
                 </motion.div>
               ))}
             </motion.div>
           </div>
 
-          {/* Recent Broadcasts */}
-          <div className="glass-panel glow-border rounded-xl border border-gray-200/80 shadow-sm overflow-hidden">
+          <div className="surface-card overflow-hidden">
             <motion.div
-              className="p-6 border-b border-gray-200 flex items-center justify-between"
+              className="px-6 py-4 border-b border-[var(--line)] flex items-center justify-between"
               variants={fadeUp}
               initial="initial"
               animate="animate"
             >
-              <h3 className="font-semibold text-gray-800">Recent Broadcasts</h3>
-              <Link to="/broadcasts" className="text-sm text-indigo-600 font-medium hover:underline">View all</Link>
+              <h3 className="font-semibold text-[var(--ink)]">Recent broadcasts</h3>
+              <Link to="/broadcasts" className="text-sm text-teal-800 font-semibold hover:underline">View all</Link>
             </motion.div>
             <motion.div
-              className="p-6 space-y-4"
+              className="p-5 space-y-3"
               variants={staggerContainer}
               initial="initial"
               animate="animate"
             >
               {broadcasts.length === 0 && (
-                <p className="text-sm text-gray-400 text-center">No broadcasts yet.</p>
+                <p className="text-sm text-slate-400 text-center py-2">No broadcasts yet.</p>
               )}
               {broadcasts.map(bc => (
                 <motion.div
                   key={bc.id}
-                  className="hover-lift flex items-center justify-between p-4 bg-gray-50/80 rounded-lg"
+                  className="hover-lift flex items-center justify-between p-3.5 rounded-xl bg-[var(--mist)]/60"
                   variants={staggerItem}
-                  whileHover={{ scale: 1.01 }}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-indigo-100 rounded-lg">
-                      <Megaphone className="w-4 h-4 text-indigo-600" />
+                    <div className="p-2 bg-white rounded-lg border border-[var(--line)]">
+                      <Megaphone className="w-4 h-4 text-teal-800" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{bc.name}</p>
-                      <p className="text-xs text-gray-500">Reach: {bc.reach.toLocaleString()}</p>
+                      <p className="text-sm font-medium text-[var(--ink)]">{bc.name}</p>
+                      <p className="text-xs text-slate-500">Reach: {bc.reach.toLocaleString()}</p>
                     </div>
                   </div>
                   <span className={cn(
                     'text-xs font-medium px-2 py-1 rounded',
-                    bc.status === 'sent' ? 'text-green-600 bg-green-50' :
-                    bc.status === 'scheduled' ? 'text-blue-600 bg-blue-50' :
-                    'text-gray-600 bg-gray-100'
+                    bc.status === 'sent' ? 'text-teal-800 bg-teal-50' :
+                    bc.status === 'scheduled' ? 'text-sky-700 bg-sky-50' :
+                    'text-slate-600 bg-slate-100'
                   )}>
                     {bc.status}
                   </span>
@@ -285,31 +315,32 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="space-y-6">
-          <div className="glass-panel glow-border p-6 rounded-xl border border-gray-200/80 shadow-sm">
-            <h3 className="font-semibold text-gray-800 mb-4">Quick Actions</h3>
-            <div className="space-y-3">
-              <Link to="/broadcasts" className="hover-lift block w-full py-2 px-4 bg-indigo-600 text-white text-center rounded-lg font-medium hover:bg-indigo-700 transition-colors">
-                Broadcast Message
+        <div className="space-y-5">
+          <div className="surface-card p-5">
+            <h3 className="font-semibold text-[var(--ink)] mb-3">Quick actions</h3>
+            <div className="space-y-2.5">
+              <Link to="/broadcasts" className="btn-primary block w-full py-2.5 text-center text-sm">
+                Broadcast message
               </Link>
-              <Link to="/ai-settings" className="hover-lift block w-full py-2 px-4 border border-indigo-600 text-indigo-600 text-center rounded-lg font-medium hover:bg-indigo-50 transition-colors">
-                Add New FAQ
+              <Link to="/ai-settings" className="block w-full py-2.5 border border-teal-800/30 text-teal-900 text-center rounded-[0.85rem] text-sm font-semibold hover:bg-teal-50">
+                Teach the AI
               </Link>
-              <Link to="/crm" className="hover-lift block w-full py-2 px-4 border border-gray-200 text-gray-600 text-center rounded-lg font-medium hover:bg-gray-50 transition-colors">
-                View CRM
+              <Link to="/crm" className="block w-full py-2.5 border border-[var(--line)] text-slate-600 text-center rounded-[0.85rem] text-sm font-semibold hover:bg-white/70">
+                Open CRM
               </Link>
             </div>
           </div>
 
-          <div className="bg-indigo-600 p-6 rounded-xl shadow-lg text-white">
-            <h3 className="font-semibold mb-2">AI Status: Online</h3>
-            <p className="text-sm text-indigo-100 mb-4">
-              SnapShop AI is handling {activeCount} active conversation{activeCount !== 1 ? 's' : ''}.
+          <div className="relative overflow-hidden rounded-[1.1rem] border border-[var(--line)] bg-[var(--ink)] p-5 text-white">
+            <div className="pointer-events-none absolute -right-8 -bottom-10 h-32 w-32 rounded-full bg-teal-400/30 blur-2xl" />
+            <h3 className="font-semibold relative">AI pulse</h3>
+            <p className="text-sm text-slate-300 mt-2 relative">
+              Handling {activeCount} active conversation{activeCount !== 1 ? 's' : ''} right now.
             </p>
-            <div className="w-full bg-indigo-500 rounded-full h-2">
-              <div className="bg-white h-2 rounded-full transition-all" style={{ width: `${Math.min(100, activeCount * 10)}%` }} />
+            <div className="mt-4 w-full bg-white/10 rounded-full h-1.5 relative">
+              <div className="bg-teal-300 h-1.5 rounded-full transition-all" style={{ width: `${Math.min(100, activeCount * 10)}%` }} />
             </div>
-            <p className="text-xs text-indigo-100 mt-2">{activeCount} active</p>
+            <p className="text-xs text-teal-200/80 mt-2 relative">{activeCount} live</p>
           </div>
         </div>
       </div>

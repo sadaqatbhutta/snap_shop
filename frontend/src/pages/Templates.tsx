@@ -98,7 +98,7 @@ export default function Templates() {
         </div>
         <button
           onClick={() => { setEditingTemplateId(null); setForm({ name: '', content: '', type: 'text' }); setIsModalOpen(true); }}
-          className="hover-lift flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+          className="hover-lift flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-teal-700 rounded-lg hover:bg-teal-800"
         >
           <Plus className="w-4 h-4" /> Create Template
         </button>
@@ -124,7 +124,7 @@ export default function Templates() {
         {filtered.map(template => (
           <motion.div
             key={template.id}
-            className="glass-panel glow-border hover-lift rounded-xl border border-gray-200/80 shadow-sm overflow-hidden flex flex-col group hover:border-indigo-300 transition-all"
+            className="glass-panel glow-border hover-lift rounded-xl border border-gray-200/80 shadow-sm overflow-hidden flex flex-col group hover:border-teal-300 transition-all"
             variants={staggerItem}
             whileHover={{ y: -2 }}
             transition={{ duration: 0.2 }}
@@ -132,7 +132,7 @@ export default function Templates() {
             <div className="p-5 flex-1">
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-2">
-                  <div className={cn('p-2 rounded-lg', template.type === 'text' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600')}>
+                  <div className={cn('p-2 rounded-lg', template.type === 'text' ? 'bg-blue-50 text-blue-600' : 'bg-teal-50 text-teal-700')}>
                     {template.type === 'text' ? <Type className="w-4 h-4" /> : <ImageIcon className="w-4 h-4" />}
                   </div>
                   <h3 className="font-semibold text-gray-900 text-sm">{template.name}</h3>
@@ -140,7 +140,7 @@ export default function Templates() {
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={() => { setEditingTemplateId(template.id); setForm({ name: template.name, content: template.content, type: template.type }); setIsModalOpen(true); }}
-                    className="p-1.5 hover:bg-gray-100 rounded text-gray-400 hover:text-indigo-600 transition-colors"
+                    className="p-1.5 hover:bg-gray-100 rounded text-gray-400 hover:text-teal-700 transition-colors"
                   >
                     <Edit2 className="w-4 h-4" />
                   </button>
@@ -166,7 +166,7 @@ export default function Templates() {
             <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
               <button
                 onClick={() => { setForm({ name: template.name + ' (copy)', content: template.content, type: template.type }); setIsModalOpen(true); }}
-                className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+                className="text-xs font-semibold text-teal-700 hover:text-teal-800 flex items-center gap-1"
               >
                 <Copy className="w-3 h-3" /> Duplicate
               </button>
@@ -181,10 +181,10 @@ export default function Templates() {
 
         <button
           onClick={() => setIsModalOpen(true)}
-          className="glass-panel glow-border hover-lift bg-gray-50/80 rounded-xl border-2 border-dashed border-gray-300 p-8 flex flex-col items-center justify-center gap-3 hover:bg-gray-100 hover:border-indigo-300 transition-all group"
+          className="glass-panel glow-border hover-lift bg-gray-50/80 rounded-xl border-2 border-dashed border-gray-300 p-8 flex flex-col items-center justify-center gap-3 hover:bg-gray-100 hover:border-teal-300 transition-all group"
         >
           <div className="p-3 bg-white rounded-full shadow-sm group-hover:scale-110 transition-transform">
-            <Plus className="w-6 h-6 text-indigo-600" />
+            <Plus className="w-6 h-6 text-teal-700" />
           </div>
           <div className="text-center">
             <p className="font-semibold text-gray-900">Add New Template</p>
@@ -208,7 +208,7 @@ export default function Templates() {
               animate="animate"
               exit="exit"
             >
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-indigo-600 text-white">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-teal-700 text-white">
               <h2 className="text-xl font-bold flex items-center gap-2"><FileText className="w-5 h-5" /> {editingTemplateId ? 'Edit Template' : 'Create Template'}</h2>
               <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white/20 rounded-full"><X className="w-5 h-5" /></button>
             </div>
@@ -217,7 +217,7 @@ export default function Templates() {
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Template Name</label>
                 <input required type="text" placeholder="e.g. Eid Mubarak Discount" value={form.name}
                   onChange={e => setForm({ ...form, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm" />
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-600 outline-none text-sm" />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Type</label>
@@ -225,7 +225,7 @@ export default function Templates() {
                   {(['text', 'image'] as const).map(t => (
                     <button key={t} type="button" onClick={() => setForm({ ...form, type: t })}
                       className={cn('flex-1 py-2 rounded-lg text-sm font-medium border transition-all capitalize',
-                        form.type === t ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                        form.type === t ? 'bg-teal-700 text-white border-teal-700' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
                       )}>
                       {t}
                     </button>
@@ -236,11 +236,11 @@ export default function Templates() {
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Message Content</label>
                 <textarea required rows={4} placeholder="Write your message here... Use [Link] for URLs."
                   value={form.content} onChange={e => setForm({ ...form, content: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm resize-none" />
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-600 outline-none text-sm resize-none" />
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => { setIsModalOpen(false); setEditingTemplateId(null); }} className="flex-1 px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancel</button>
-                <button type="submit" disabled={saving} className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-60 flex items-center justify-center gap-2">
+                <button type="submit" disabled={saving} className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-teal-700 rounded-lg hover:bg-teal-800 disabled:opacity-60 flex items-center justify-center gap-2">
                   {saving && <Loader2 className="w-4 h-4 animate-spin" />} {editingTemplateId ? 'Update Template' : 'Save Template'}
                 </button>
               </div>

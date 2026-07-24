@@ -111,9 +111,9 @@ function IntegrationsPanel({ businessId, business, onClose }: { businessId: stri
       id: 'webchat',
       name: 'Web Chat',
       icon: MessageSquare,
-      color: 'text-indigo-600',
-      bg: 'bg-indigo-50',
-      border: 'border-indigo-200',
+      color: 'text-teal-700',
+      bg: 'bg-teal-50',
+      border: 'border-teal-200',
       description: 'Embed a chat widget on your website',
       webhook: `${baseUrl}/api/webchat/message`,
       docs: `${baseUrl}/webchat-widget.js`,
@@ -183,12 +183,12 @@ function IntegrationsPanel({ businessId, business, onClose }: { businessId: stri
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div className="glass-panel glow-border bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-indigo-600 text-white">
+        <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-[var(--ink)] text-white">
           <div className="flex items-center gap-3">
             <Globe className="w-6 h-6" />
             <div>
               <h2 className="text-xl font-bold">Channel Integrations</h2>
-              <p className="text-indigo-200 text-sm">Connect your messaging channels via webhooks</p>
+              <p className="text-teal-200 text-sm">Connect your messaging channels via webhooks</p>
             </div>
           </div>
           <button aria-label="Close integrations panel" onClick={onClose} className="p-2 hover:bg-white/20 rounded-full transition-colors">
@@ -201,7 +201,7 @@ function IntegrationsPanel({ businessId, business, onClose }: { businessId: stri
           <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
             <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Your Business ID</p>
             <div className="flex items-center gap-2">
-              <code className="flex-1 text-sm text-indigo-700 bg-white px-3 py-2 rounded-lg border border-gray-200 break-all">
+              <code className="flex-1 text-sm text-teal-800 bg-white px-3 py-2 rounded-lg border border-gray-200 break-all">
                 {businessId}
               </code>
               <button
@@ -256,7 +256,7 @@ function IntegrationsPanel({ businessId, business, onClose }: { businessId: stri
                     href={ch.docs}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                    className="flex items-center gap-1 text-xs text-teal-700 hover:text-teal-800 font-medium"
                   >
                     Docs <ExternalLink className="w-3 h-3" />
                   </a>
@@ -292,7 +292,7 @@ function IntegrationsPanel({ businessId, business, onClose }: { businessId: stri
             </div>
           </div>
 
-          <form onSubmit={saveCredentials} className="p-4 rounded-xl border border-indigo-100 bg-indigo-50/40 space-y-3">
+          <form onSubmit={saveCredentials} className="p-4 rounded-xl border border-teal-100 bg-teal-50/40 space-y-3">
             <div>
               <p className="text-sm font-bold text-gray-800">Channel credentials</p>
               <p className="text-xs text-gray-500 mt-1">
@@ -321,36 +321,36 @@ function IntegrationsPanel({ businessId, business, onClose }: { businessId: stri
             <div className="space-y-2">
               <label className="block text-xs font-semibold text-gray-600" htmlFor="meta-token">Meta access token</label>
               <input id="meta-token" type="password" autoComplete="off" value={metaAccessToken} onChange={e => setMetaAccessToken(e.target.value)}
-                placeholder={status?.metaAccessToken?.hint || 'EAAG…'} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500" />
+                placeholder={status?.metaAccessToken?.hint || 'EAAG…'} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-teal-600" />
             </div>
             <div className="space-y-2">
               <label className="block text-xs font-semibold text-gray-600" htmlFor="wa-phone-id">WhatsApp phone number ID</label>
               <input id="wa-phone-id" type="text" value={whatsappPhoneNumberId} onChange={e => setWhatsappPhoneNumberId(e.target.value)}
-                placeholder={status?.whatsappPhoneNumberId?.hint || '1234567890'} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500" />
+                placeholder={status?.whatsappPhoneNumberId?.hint || '1234567890'} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-teal-600" />
               <p className="text-[11px] text-gray-500">Must match Meta webhook <code>phone_number_id</code> so inbound WA messages route to this business.</p>
             </div>
             <div className="space-y-2">
               <label className="block text-xs font-semibold text-gray-600" htmlFor="fb-page-id">Facebook Page ID</label>
               <input id="fb-page-id" type="text" value={facebookPageId} onChange={e => setFacebookPageId(e.target.value)}
-                placeholder={status?.facebookPageId?.hint || 'Optional'} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500" />
+                placeholder={status?.facebookPageId?.hint || 'Optional'} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-teal-600" />
             </div>
             <div className="space-y-2">
               <label className="block text-xs font-semibold text-gray-600" htmlFor="ig-page-id">Instagram Page / Account ID</label>
               <input id="ig-page-id" type="text" value={instagramPageId} onChange={e => setInstagramPageId(e.target.value)}
-                placeholder={status?.instagramPageId?.hint || 'Optional'} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500" />
+                placeholder={status?.instagramPageId?.hint || 'Optional'} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-teal-600" />
             </div>
             <div className="space-y-2">
               <label className="block text-xs font-semibold text-gray-600" htmlFor="tiktok-token">TikTok access token</label>
               <input id="tiktok-token" type="password" autoComplete="off" value={tiktokAccessToken} onChange={e => setTiktokAccessToken(e.target.value)}
-                placeholder={status?.tiktokAccessToken?.hint || 'Optional'} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500" />
+                placeholder={status?.tiktokAccessToken?.hint || 'Optional'} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-teal-600" />
             </div>
             <div className="space-y-2">
               <label className="block text-xs font-semibold text-gray-600" htmlFor="tiktok-biz-id">TikTok business / open id</label>
               <input id="tiktok-biz-id" type="text" value={tiktokBusinessId} onChange={e => setTiktokBusinessId(e.target.value)}
-                placeholder={status?.tiktokBusinessId?.hint || 'Optional'} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500" />
+                placeholder={status?.tiktokBusinessId?.hint || 'Optional'} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-teal-600" />
             </div>
             {credsMsg && <p className="text-xs font-medium text-gray-700">{credsMsg}</p>}
-            <button type="submit" disabled={savingCreds} className="w-full py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 disabled:opacity-60">
+            <button type="submit" disabled={savingCreds} className="w-full py-2.5 bg-[var(--ink)] text-white rounded-lg text-sm font-bold hover:bg-teal-800 disabled:opacity-60">
               {savingCreds ? 'Saving…' : 'Save credentials'}
             </button>
             <button
@@ -479,7 +479,7 @@ function SecurityPanel({ onClose }: { onClose: () => void }) {
         animate="animate"
         exit="exit"
       >
-        <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-indigo-600 text-white">
+        <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-[var(--ink)] text-white">
           <div className="flex items-center gap-3">
             <Lock className="w-6 h-6" />
             <h2 className="text-xl font-bold">Security</h2>
@@ -488,11 +488,11 @@ function SecurityPanel({ onClose }: { onClose: () => void }) {
         </div>
 
         <form onSubmit={handleChangePassword} className="p-6 space-y-5">
-          <div className="flex items-center gap-3 p-4 bg-indigo-50 rounded-xl border border-indigo-100">
-            <KeyRound className="w-5 h-5 text-indigo-600 shrink-0" />
+          <div className="flex items-center gap-3 p-4 bg-teal-50 rounded-xl border border-teal-100">
+            <KeyRound className="w-5 h-5 text-teal-700 shrink-0" />
             <div>
-              <p className="text-sm font-semibold text-indigo-900">Change Password</p>
-              <p className="text-xs text-indigo-600">Update your account password below.</p>
+              <p className="text-sm font-semibold text-teal-900">Change Password</p>
+              <p className="text-xs text-teal-700">Update your account password below.</p>
             </div>
           </div>
 
@@ -527,7 +527,7 @@ function SecurityPanel({ onClose }: { onClose: () => void }) {
                   required
                   value={field.value}
                   onChange={e => field.onChange(e.target.value)}
-                  className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                  className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-600 outline-none text-sm"
                 />
                 <button type="button" aria-label={showPasswords ? 'Hide passwords' : 'Show passwords'} onClick={() => setShowPasswords(!showPasswords)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
@@ -542,7 +542,7 @@ function SecurityPanel({ onClose }: { onClose: () => void }) {
             <motion.button
               type="submit"
               disabled={saving}
-              className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-60 flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-teal-700 rounded-lg hover:bg-teal-800 disabled:opacity-60 flex items-center justify-center gap-2"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
               transition={{ duration: 0.15 }}
@@ -629,7 +629,7 @@ function BillingPanel({ businessId, onClose }: { businessId: string; onClose: ()
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div className="glass-panel glow-border bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-indigo-600 text-white">
+        <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-[var(--ink)] text-white">
           <div className="flex items-center gap-3">
             <CreditCard className="w-6 h-6" />
             <h2 className="text-xl font-bold">Billing &amp; plans</h2>
@@ -660,7 +660,7 @@ function BillingPanel({ businessId, onClose }: { businessId: string; onClose: ()
                       <span>{row.used}{row.limit < 0 ? '' : ` / ${row.limit}`}</span>
                     </div>
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${usagePct(row.used, row.limit)}%` }} />
+                      <div className="h-full bg-teal-600 rounded-full" style={{ width: `${usagePct(row.used, row.limit)}%` }} />
                     </div>
                   </div>
                 ))}
@@ -669,11 +669,11 @@ function BillingPanel({ businessId, onClose }: { businessId: string; onClose: ()
               {data.configured ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <button type="button" disabled={!!busy || data.plan === 'growth'} onClick={() => void checkout('growth')}
-                    className="px-4 py-3 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 disabled:opacity-50">
+                    className="px-4 py-3 bg-[var(--ink)] text-white rounded-lg text-sm font-bold hover:bg-teal-800 disabled:opacity-50">
                     {busy === 'growth' ? 'Redirecting…' : 'Upgrade Growth Pro ($79)'}
                   </button>
                   <button type="button" disabled={!!busy || data.plan === 'scale'} onClick={() => void checkout('scale')}
-                    className="px-4 py-3 bg-violet-700 text-white rounded-lg text-sm font-bold hover:bg-violet-800 disabled:opacity-50">
+                    className="px-4 py-3 bg-teal-800 text-white rounded-lg text-sm font-bold hover:bg-teal-900 disabled:opacity-50">
                     {busy === 'scale' ? 'Redirecting…' : 'Upgrade Scale Plus ($149)'}
                   </button>
                   <button type="button" disabled={!!busy} onClick={() => void openPortal()}
@@ -687,7 +687,7 @@ function BillingPanel({ businessId, onClose }: { businessId: string; onClose: ()
                     In-app Stripe checkout is not configured on this server yet. Contact sales for Growth Pro / Scale Plus, or ask an admin to set Stripe price IDs.
                   </p>
                   <button type="button" onClick={() => window.open('mailto:sales@snapshop.ai?subject=SnapShop%20billing%20inquiry', '_blank')}
-                    className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700">
+                    className="w-full px-4 py-3 bg-[var(--ink)] text-white rounded-lg text-sm font-bold hover:bg-teal-800">
                     Contact sales
                   </button>
                 </div>
@@ -746,12 +746,12 @@ function TeamPanel({ businessId, onClose }: { businessId: string; onClose: () =>
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div className="glass-panel glow-border bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col border border-gray-100">
-        <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-indigo-600 text-white">
+        <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-[var(--ink)] text-white">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md"><Users className="w-8 h-8" /></div>
             <div>
               <h2 className="text-2xl font-black">Team Management</h2>
-              <p className="text-indigo-100 text-sm font-medium">Manage agents and administrators</p>
+              <p className="text-teal-100 text-sm font-medium">Manage agents and administrators</p>
             </div>
           </div>
           <button aria-label="Close team panel" onClick={onClose} className="p-2 hover:bg-white/20 rounded-full transition-all group"><X className="w-6 h-6 group-rotate-90 transition-transform" /></button>
@@ -760,16 +760,16 @@ function TeamPanel({ businessId, onClose }: { businessId: string; onClose: () =>
         <div className="flex-1 overflow-y-auto p-8 space-y-10">
           {teamLoadError && <LoadErrorBanner message={teamLoadError} onRetry={retryTeam} />}
           <section className="space-y-6">
-            <h3 className="text-lg font-black text-gray-900 flex items-center gap-2 px-1"><UserPlus className="w-5 h-5 text-indigo-600" /> Invite Teammate</h3>
+            <h3 className="text-lg font-black text-gray-900 flex items-center gap-2 px-1"><UserPlus className="w-5 h-5 text-teal-700" /> Invite Teammate</h3>
             <form onSubmit={handleInvite} className="flex flex-col md:flex-row gap-4 p-6 bg-gray-50 rounded-3xl border border-gray-100 shadow-sm transition-all hover:bg-white hover:shadow-md">
               <label htmlFor="invite-email" className="sr-only">Invite teammate email</label>
-              <input id="invite-email" required type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="colleague@company.com" className="flex-1 px-5 py-3 bg-white border border-gray-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-medium text-sm" />
+              <input id="invite-email" required type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="colleague@company.com" className="flex-1 px-5 py-3 bg-white border border-gray-200 rounded-2xl focus:ring-4 focus:ring-teal-600/10 outline-none transition-all font-medium text-sm" />
               <label htmlFor="invite-role" className="sr-only">Invite teammate role</label>
-              <select id="invite-role" value={role} onChange={e => setRole(e.target.value as any)} className="w-full md:w-32 px-4 py-3 bg-white border border-gray-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 outline-none font-bold text-sm">
+              <select id="invite-role" value={role} onChange={e => setRole(e.target.value as any)} className="w-full md:w-32 px-4 py-3 bg-white border border-gray-200 rounded-2xl focus:ring-4 focus:ring-teal-600/10 outline-none font-bold text-sm">
                 <option value="agent">Agent</option>
                 <option value="admin">Admin</option>
               </select>
-              <button type="submit" disabled={loading} className="px-8 py-3.5 bg-indigo-600 text-white rounded-2xl font-black text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-100 disabled:opacity-50 transition-all active:scale-95">{loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Send Invite'}</button>
+              <button type="submit" disabled={loading} className="px-8 py-3.5 bg-[var(--ink)] text-white rounded-2xl font-black text-sm hover:bg-teal-800 shadow-lg shadow-teal-100 disabled:opacity-50 transition-all active:scale-95">{loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Send Invite'}</button>
             </form>
           </section>
 
@@ -779,10 +779,10 @@ function TeamPanel({ businessId, onClose }: { businessId: string; onClose: () =>
               {agents.map(agent => (
                 <div key={agent.id} className="flex items-center justify-between p-5 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow group">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center font-black text-lg">{agent.name?.[0] || 'A'}</div>
+                    <div className="w-12 h-12 bg-teal-50 text-teal-700 rounded-xl flex items-center justify-center font-black text-lg">{agent.name?.[0] || 'A'}</div>
                     <div className="flex flex-col"><span className="font-bold text-gray-900">{agent.name}</span><span className="text-xs text-gray-400 font-medium">{agent.email}</span></div>
                   </div>
-                  <span className={cn('px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest', agent.role === 'admin' ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700')}>{agent.role}</span>
+                  <span className={cn('px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest', agent.role === 'admin' ? 'bg-teal-100 text-teal-800' : 'bg-emerald-100 text-emerald-700')}>{agent.role}</span>
                 </div>
               ))}
             </div>
@@ -961,7 +961,7 @@ export default function Settings() {
       <motion.div className="glass-panel glow-border bg-white/80 p-8 rounded-xl border border-gray-200/80 shadow-sm space-y-6" variants={staggerItem}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-50 rounded-lg"><SettingsIcon className="w-6 h-6 text-indigo-600" /></div>
+            <div className="p-2 bg-teal-50 rounded-lg"><SettingsIcon className="w-6 h-6 text-teal-700" /></div>
             <div>
               <h3 className="text-lg font-semibold text-gray-900">General Settings</h3>
               <p className="text-sm text-gray-500">Manage your business profile and preferences.</p>
@@ -970,7 +970,7 @@ export default function Settings() {
           <motion.button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-60"
+            className="flex items-center gap-2 px-4 py-2 bg-[var(--ink)] text-white rounded-lg font-medium hover:bg-teal-800 disabled:opacity-60"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.97 }}
             transition={{ duration: 0.15 }}
@@ -984,21 +984,21 @@ export default function Settings() {
           <div className="space-y-2">
             <label htmlFor="business-name" className="text-sm font-medium text-gray-700">Business Name</label>
             <input id="business-name" type="text" value={businessName} onChange={e => setBusinessName(e.target.value)}
-              className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+              className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-600 outline-none" />
           </div>
           <div className="space-y-2">
             <label htmlFor="business-email" className="text-sm font-medium text-gray-700">Business Email</label>
             <input id="business-email" type="email" value={businessEmail} onChange={e => setBusinessEmail(e.target.value)}
-              className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+              className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-600 outline-none" />
           </div>
         </div>
 
-        <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-100">
-          <p className="text-xs font-semibold text-indigo-700 mb-2">Your Business ID</p>
-          <code className="text-xs text-indigo-900 bg-white px-3 py-1.5 rounded border border-indigo-200 block break-all">
+        <div className="p-4 bg-teal-50 rounded-lg border border-teal-100">
+          <p className="text-xs font-semibold text-teal-800 mb-2">Your Business ID</p>
+          <code className="text-xs text-teal-900 bg-white px-3 py-1.5 rounded border border-teal-200 block break-all">
             {businessId || 'Loading...'}
           </code>
-          <p className="text-xs text-indigo-700 mt-2">Use this as <code>business_id</code> in webhook payloads.</p>
+          <p className="text-xs text-teal-800 mt-2">Use this as <code>business_id</code> in webhook payloads.</p>
         </div>
       </motion.div>
 
@@ -1087,7 +1087,7 @@ export default function Settings() {
               placeholder="Label (e.g. Shipping policy)"
               value={macroLabel}
               onChange={e => setMacroLabel(e.target.value)}
-              className="px-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+              className="px-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-600 outline-none"
             />
             <button
               type="button"
@@ -1109,7 +1109,7 @@ export default function Settings() {
             placeholder="Message text to insert…"
             value={macroContent}
             onChange={e => setMacroContent(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
+            className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-600 outline-none resize-none"
           />
         </div>
       </motion.div>
@@ -1117,7 +1117,7 @@ export default function Settings() {
       {/* Email Notifications */}
       <motion.div className="glass-panel glow-border bg-white/80 p-8 rounded-xl border border-gray-200/80 shadow-sm space-y-6" variants={staggerItem}>
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-indigo-50 rounded-lg"><Mail className="w-6 h-6 text-indigo-600" /></div>
+          <div className="p-2 bg-teal-50 rounded-lg"><Mail className="w-6 h-6 text-teal-700" /></div>
           <div>
             <h3 className="text-lg font-semibold text-gray-900">Email Notifications</h3>
             <p className="text-sm text-gray-500">Configure your email alert preferences.</p>
@@ -1139,7 +1139,7 @@ export default function Settings() {
               <motion.button
                 aria-label={`Toggle ${item.title}`}
                 onClick={() => toggle(item.key)}
-                className={cn('w-12 h-6 rounded-full transition-colors relative', notifications[item.key] ? 'bg-indigo-600' : 'bg-gray-200')}
+                className={cn('w-12 h-6 rounded-full transition-colors relative', notifications[item.key] ? 'bg-teal-700' : 'bg-gray-200')}
                 whileTap={{ scale: 0.95 }}
               >
                 <div className={cn('absolute top-1 w-4 h-4 bg-white rounded-full transition-all', notifications[item.key] ? 'left-7' : 'left-1')} />
@@ -1151,7 +1151,7 @@ export default function Settings() {
             <div className="flex-1">
               <label htmlFor="delivery-frequency" className="text-sm font-semibold text-gray-900 block mb-1">Delivery Frequency</label>
               <select id="delivery-frequency" value={notifications.frequency} onChange={e => setNotifications(prev => ({ ...prev, frequency: e.target.value }))}
-                className="w-full max-w-xs px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                className="w-full max-w-xs px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-600 outline-none">
                 <option value="instant">Instant (Real-time)</option>
                 <option value="daily">Daily Digest</option>
                 <option value="weekly">Weekly Summary</option>
@@ -1165,25 +1165,25 @@ export default function Settings() {
       <motion.div className="space-y-4" variants={staggerItem}>
         {sections.map(section => (
           <button key={section.label} onClick={() => setActivePanel(section.panel)}
-            className="hover-lift w-full glass-panel glow-border bg-white/80 p-6 rounded-xl border border-gray-200/80 shadow-sm flex items-center justify-between hover:bg-gray-50 hover:border-indigo-200 transition-all group">
+            className="hover-lift w-full glass-panel glow-border bg-white/80 p-6 rounded-xl border border-gray-200/80 shadow-sm flex items-center justify-between hover:bg-gray-50 hover:border-teal-200 transition-all group">
             <div className="flex items-center gap-4 text-left">
-              <div className="p-2 bg-gray-100 rounded-lg group-hover:bg-indigo-50 transition-colors">
-                <section.icon className="w-5 h-5 text-gray-600 group-hover:text-indigo-600 transition-colors" />
+              <div className="p-2 bg-gray-100 rounded-lg group-hover:bg-teal-50 transition-colors">
+                <section.icon className="w-5 h-5 text-gray-600 group-hover:text-teal-700 transition-colors" />
               </div>
               <div>
                 <h4 className="font-semibold text-gray-900">{section.label}</h4>
                 <p className="text-sm text-gray-500">{section.description}</p>
               </div>
             </div>
-            <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-indigo-600 transition-colors" />
+            <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-teal-700 transition-colors" />
           </button>
         ))}
       </motion.div>
 
       {/* Legal */}
       <motion.div className="flex flex-wrap gap-4 text-sm text-gray-500" variants={staggerItem}>
-        <Link to="/privacy" className="hover:text-indigo-600 underline-offset-2 hover:underline">Privacy Policy</Link>
-        <Link to="/terms" className="hover:text-indigo-600 underline-offset-2 hover:underline">Terms of Service</Link>
+        <Link to="/privacy" className="hover:text-teal-700 underline-offset-2 hover:underline">Privacy Policy</Link>
+        <Link to="/terms" className="hover:text-teal-700 underline-offset-2 hover:underline">Terms of Service</Link>
       </motion.div>
 
       {/* Danger Zone */}
