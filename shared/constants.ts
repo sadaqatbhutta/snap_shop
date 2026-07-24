@@ -10,6 +10,7 @@ export const CHANNELS = [
   { id: 'whatsapp', name: 'WhatsApp', icon: 'Phone' },
   { id: 'instagram', name: 'Instagram', icon: 'Instagram' },
   { id: 'facebook', name: 'Facebook', icon: 'Facebook' },
+  { id: 'tiktok', name: 'TikTok', icon: 'Music2' },
   { id: 'webchat', name: 'Web Chat', icon: 'MessageSquare' },
 ];
 

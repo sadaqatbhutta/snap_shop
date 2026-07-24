@@ -1,9 +1,10 @@
 import crypto from 'crypto';
-import axios from 'axios';
 import { db } from '../config/firebase.js';
 import { config } from '../config/config.js';
 import { buildError } from '../utils/errors.js';
 import { recordAuditEvent } from './audit.service.js';
+import { sendEmail, isEmailConfigured } from './email.service.js';
+import { assertAgentSeatAvailable } from './usage.service.js';
 
 interface InvitePayload {
   businessId: string;
@@ -27,6 +28,8 @@ export async function inviteAgentToTeam(payload: InvitePayload, requestId: strin
     throw buildError('FORBIDDEN', 'Only the business owner may invite team members', 403);
   }
 
+  await assertAgentSeatAvailable(payload.businessId);
+
   const token = crypto.randomBytes(32).toString('hex');
   const inviteRef = businessRef.collection('invites').doc(token);
   const inviteData = {
@@ -48,21 +51,20 @@ export async function inviteAgentToTeam(payload: InvitePayload, requestId: strin
     });
   }
   const inviteUrl = `${config.APP_URL}/join?token=${token}`;
+  const businessName = business?.name || 'your team';
 
-  let emailSent = false;
-  if (config.SMTP_API_URL) {
-    await axios.post(config.SMTP_API_URL, {
-      to: payload.email,
-      subject: `Invitation to join ${business?.name || 'your team'} on SnapShop`,
-      content: `Use this link to accept the invite: ${inviteUrl}`,
-    });
-    emailSent = true;
-  }
+  const emailSent = await sendEmail({
+    to: payload.email,
+    subject: `Invitation to join ${businessName} on SnapShop`,
+    text: `You have been invited to join ${businessName} on SnapShop AI.\n\nAccept the invite: ${inviteUrl}\n\nThis link expires in 24 hours.`,
+    html: `<p>You have been invited to join <strong>${businessName}</strong> on SnapShop AI.</p><p><a href="${inviteUrl}">Accept invitation</a></p><p>This link expires in 24 hours.</p>`,
+  });
 
   return {
     inviteUrl,
     token,
     emailSent,
+    emailConfigured: isEmailConfigured(),
     warning: emailSent ? undefined : 'SMTP is not configured. Share inviteUrl manually.',
   };
 }

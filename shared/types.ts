@@ -30,6 +30,29 @@ export interface Business {
   confidenceThreshold: number;
   onboarding?: OnboardingProgress;
   aiMacros?: AIMacro[];
+  metaAccessToken?: string | null;
+  whatsappPhoneNumberId?: string | null;
+  tiktokAccessToken?: string | null;
+  tiktokApiBase?: string | null;
+  tiktokSendPath?: string | null;
+  notifications?: {
+    inquiries?: boolean;
+    escalations?: boolean;
+    frequency?: 'instant' | 'daily' | 'weekly' | string;
+  };
+  billing?: {
+    plan?: 'free' | 'growth' | 'scale' | 'enterprise';
+    status?: string;
+    stripeCustomerId?: string;
+    stripeSubscriptionId?: string;
+    currentPeriodEnd?: string | null;
+  };
+  usage?: {
+    periodStart?: string;
+    messages?: number;
+    aiCalls?: number;
+    broadcasts?: number;
+  };
 }
 
 export interface Customer {

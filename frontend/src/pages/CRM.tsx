@@ -16,7 +16,7 @@ import { TableSkeleton } from '../components/Skeleton';
 import { PAGE_LOAD_TIMEOUT_MS } from '../lib/constants';
 
 type SortKey = keyof Customer | null;
-type FilterChannel = 'all' | 'whatsapp' | 'instagram' | 'facebook' | 'webchat';
+type FilterChannel = 'all' | 'whatsapp' | 'instagram' | 'facebook' | 'tiktok' | 'webchat';
 
 export default function CRM() {
   const { businessId } = useBusiness();
@@ -208,7 +208,7 @@ export default function CRM() {
             </button>
             {showFilterMenu && (
               <div className="absolute top-full mt-1 left-0 bg-white border border-gray-200 rounded-xl shadow-lg z-20 w-44 overflow-hidden">
-                {(['all', 'whatsapp', 'instagram', 'facebook', 'webchat'] as FilterChannel[]).map(ch => (
+                {(['all', 'whatsapp', 'instagram', 'facebook', 'tiktok', 'webchat'] as FilterChannel[]).map(ch => (
                   <button key={ch} onClick={() => { setFilterChannel(ch); setShowFilterMenu(false); }}
                     className={cn('w-full text-left px-4 py-2.5 text-sm capitalize hover:bg-gray-50 transition-colors',
                       filterChannel === ch ? 'text-indigo-600 font-semibold bg-indigo-50' : 'text-gray-700'

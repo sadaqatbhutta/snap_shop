@@ -1,12 +1,12 @@
 import React, { Suspense, lazy, useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useNavigate } from 'react-router-dom';
 import {
   Settings as SettingsIcon, Lock, Globe, CreditCard, ChevronRight,
-  Mail, AlertTriangle, PhoneCall, Clock, Save, Loader2, CheckCircle2,
+  Mail, AlertTriangle, Clock, Save, Loader2, CheckCircle2,
   X, Copy, Check, Phone, MessageSquare, ExternalLink, Music2,
   Eye, EyeOff, KeyRound, Users, UserPlus
 } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { useBusiness } from '../context/BusinessContext';
 import { db, auth } from '../firebase';
@@ -36,8 +36,28 @@ type RuntimePayload = {
 // ─── Integrations Panel ───────────────────────────────────────────────────────
 function IntegrationsPanel({ businessId, business, onClose }: { businessId: string; business: any; onClose: () => void }) {
   const [copied, setCopied] = useState<string | null>(null);
+  const [savingCreds, setSavingCreds] = useState(false);
+  const [credsMsg, setCredsMsg] = useState<string | null>(null);
+  const [metaAccessToken, setMetaAccessToken] = useState('');
+  const [whatsappPhoneNumberId, setWhatsappPhoneNumberId] = useState('');
+  const [tiktokAccessToken, setTiktokAccessToken] = useState('');
+  const [status, setStatus] = useState<any>(null);
 
   const baseUrl = getApiBaseUrl();
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        const resp = await fetch(getApiUrl(`/api/business/${businessId}/integrations`), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (resp.ok) setStatus(await resp.json());
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, [businessId]);
 
   const channels = [
     {
@@ -99,9 +119,9 @@ function IntegrationsPanel({ businessId, business, onClose }: { businessId: stri
 
   const embedSnippet = `<script src="${baseUrl}/webchat-widget.js" data-business-id="${businessId}" data-api-base="${baseUrl}" data-title="Chat with us" data-position="right" defer></script>`;
   const integrationHealth = [
-    { key: 'metaAccessToken', label: 'Meta Access Token', ok: Boolean(business?.metaAccessToken) },
-    { key: 'whatsappPhoneNumberId', label: 'WhatsApp Number ID', ok: Boolean(business?.whatsappPhoneNumberId) },
-    { key: 'tiktokAccessToken', label: 'TikTok Access Token', ok: Boolean(business?.tiktokAccessToken) },
+    { key: 'metaAccessToken', label: 'Meta Access Token', ok: Boolean(status?.metaAccessToken?.configured || business?.metaAccessToken) },
+    { key: 'whatsappPhoneNumberId', label: 'WhatsApp Number ID', ok: Boolean(status?.whatsappPhoneNumberId?.configured || business?.whatsappPhoneNumberId) },
+    { key: 'tiktokAccessToken', label: 'TikTok Access Token', ok: Boolean(status?.tiktokAccessToken?.configured || business?.tiktokAccessToken) },
     { key: 'webchat', label: 'Webchat Widget Script', ok: Boolean(baseUrl) },
   ];
 
@@ -109,6 +129,43 @@ function IntegrationsPanel({ businessId, business, onClose }: { businessId: stri
     navigator.clipboard.writeText(text);
     setCopied(key);
     setTimeout(() => setCopied(null), 2000);
+  };
+
+  const saveCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingCreds(true);
+    setCredsMsg(null);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const body: Record<string, string> = {};
+      if (metaAccessToken.trim()) body.metaAccessToken = metaAccessToken.trim();
+      if (whatsappPhoneNumberId.trim()) body.whatsappPhoneNumberId = whatsappPhoneNumberId.trim();
+      if (tiktokAccessToken.trim()) body.tiktokAccessToken = tiktokAccessToken.trim();
+      if (Object.keys(body).length === 0) {
+        setCredsMsg('Enter at least one credential to save.');
+        setSavingCreds(false);
+        return;
+      }
+      const resp = await fetch(getApiUrl(`/api/business/${businessId}/integrations`), {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(data.message || 'Failed to save credentials');
+      setStatus(data);
+      setMetaAccessToken('');
+      setWhatsappPhoneNumberId('');
+      setTiktokAccessToken('');
+      setCredsMsg('Credentials saved securely.');
+    } catch (err: any) {
+      setCredsMsg(err.message || 'Failed to save');
+    } finally {
+      setSavingCreds(false);
+    }
   };
 
   return (
@@ -217,12 +274,40 @@ function IntegrationsPanel({ businessId, business, onClose }: { businessId: stri
                 <div key={item.key} className="flex items-center justify-between text-xs">
                   <span className="text-gray-600">{item.label}</span>
                   <span className={cn('px-2 py-0.5 rounded-full font-bold', item.ok ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700')}>
-                    {item.ok ? 'Configured' : 'Missing'}
+                    {item.ok ? (status?.[item.key]?.hint ? `Configured ${status[item.key].hint}` : 'Configured') : 'Missing'}
                   </span>
                 </div>
               ))}
             </div>
           </div>
+
+          <form onSubmit={saveCredentials} className="p-4 rounded-xl border border-indigo-100 bg-indigo-50/40 space-y-3">
+            <div>
+              <p className="text-sm font-bold text-gray-800">Channel credentials</p>
+              <p className="text-xs text-gray-500 mt-1">
+                Paste tokens for this business. Leave blank to keep existing values. Secrets are stored on the server and returned masked.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-gray-600" htmlFor="meta-token">Meta access token</label>
+              <input id="meta-token" type="password" autoComplete="off" value={metaAccessToken} onChange={e => setMetaAccessToken(e.target.value)}
+                placeholder={status?.metaAccessToken?.hint || 'EAAG…'} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-gray-600" htmlFor="wa-phone-id">WhatsApp phone number ID</label>
+              <input id="wa-phone-id" type="text" value={whatsappPhoneNumberId} onChange={e => setWhatsappPhoneNumberId(e.target.value)}
+                placeholder={status?.whatsappPhoneNumberId?.hint || '1234567890'} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-gray-600" htmlFor="tiktok-token">TikTok access token</label>
+              <input id="tiktok-token" type="password" autoComplete="off" value={tiktokAccessToken} onChange={e => setTiktokAccessToken(e.target.value)}
+                placeholder={status?.tiktokAccessToken?.hint || 'Optional'} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            {credsMsg && <p className="text-xs font-medium text-gray-700">{credsMsg}</p>}
+            <button type="submit" disabled={savingCreds} className="w-full py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 disabled:opacity-60">
+              {savingCreds ? 'Saving…' : 'Save credentials'}
+            </button>
+          </form>
 
           <div className="p-4 bg-gray-900 rounded-xl">
             <div className="flex items-center justify-between mb-3">
@@ -400,28 +485,143 @@ function SecurityPanel({ onClose }: { onClose: () => void }) {
 }
 
 // ─── Billing Panel ────────────────────────────────────────────────────────────
-function BillingPanel({ onClose }: { onClose: () => void }) {
+function BillingPanel({ businessId, onClose }: { businessId: string; onClose: () => void }) {
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [data, setData] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        const resp = await fetch(getApiUrl(`/api/billing/${businessId}`), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = await resp.json();
+        if (!resp.ok) throw new Error(json.message || 'Failed to load billing');
+        setData(json);
+      } catch (err: any) {
+        setError(err.message || 'Failed to load billing');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [businessId]);
+
+  const checkout = async (plan: 'growth' | 'scale') => {
+    setBusy(plan);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const resp = await fetch(getApiUrl(`/api/billing/${businessId}/checkout`), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ plan }),
+      });
+      const json = await resp.json();
+      if (!resp.ok) throw new Error(json.message || 'Checkout failed');
+      if (json.url) window.location.href = json.url;
+    } catch (err: any) {
+      alert(err.message || 'Checkout failed');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const openPortal = async () => {
+    setBusy('portal');
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const resp = await fetch(getApiUrl(`/api/billing/${businessId}/portal`), {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await resp.json();
+      if (!resp.ok) throw new Error(json.message || 'Portal unavailable');
+      if (json.url) window.location.href = json.url;
+    } catch (err: any) {
+      alert(err.message || 'Billing portal unavailable');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const usagePct = (used: number, limit: number) => {
+    if (limit < 0) return 0;
+    return Math.min(100, Math.round((used / Math.max(limit, 1)) * 100));
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="glass-panel glow-border bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div className="glass-panel glow-border bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
         <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-indigo-600 text-white">
           <div className="flex items-center gap-3">
             <CreditCard className="w-6 h-6" />
-            <h2 className="text-xl font-bold">Billing</h2>
+            <h2 className="text-xl font-bold">Billing &amp; plans</h2>
           </div>
           <button aria-label="Close billing panel" onClick={onClose} className="p-2 hover:bg-white/20 rounded-full"><X className="w-5 h-5" /></button>
         </div>
-        <div className="p-6 space-y-6">
-          <p className="text-sm text-gray-600">
-            Paid plans and in-app checkout are not enabled yet. Contact us for pricing, limits, and onboarding.
-          </p>
-          <button
-            type="button"
-            onClick={() => window.open('mailto:sales@snapshop.ai?subject=SnapShop%20billing%20inquiry', '_blank')}
-            className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700"
-          >
-            Contact sales
-          </button>
+        <div className="p-6 space-y-5 overflow-y-auto">
+          {loading && <p className="text-sm text-gray-500">Loading billing…</p>}
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          {!loading && data && (
+            <>
+              <div className="p-4 rounded-xl border border-gray-200 bg-gray-50">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Current plan</p>
+                <p className="text-lg font-bold text-gray-900 mt-1">{data.planName || data.plan}</p>
+                <p className="text-xs text-gray-500 mt-1 capitalize">Status: {data.billingStatus || data.status}</p>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-sm font-bold text-gray-800">This month usage</p>
+                {[
+                  { label: 'Messages', used: data.usage?.messages || 0, limit: data.limits?.messagesPerMonth },
+                  { label: 'AI calls', used: data.usage?.aiCalls || 0, limit: data.limits?.aiCallsPerMonth },
+                  { label: 'Broadcasts', used: data.usage?.broadcasts || 0, limit: data.limits?.broadcastsPerMonth },
+                ].map(row => (
+                  <div key={row.label}>
+                    <div className="flex justify-between text-xs text-gray-600 mb-1">
+                      <span>{row.label}</span>
+                      <span>{row.used}{row.limit < 0 ? '' : ` / ${row.limit}`}</span>
+                    </div>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${usagePct(row.used, row.limit)}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {data.configured ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button type="button" disabled={!!busy || data.plan === 'growth'} onClick={() => void checkout('growth')}
+                    className="px-4 py-3 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 disabled:opacity-50">
+                    {busy === 'growth' ? 'Redirecting…' : 'Upgrade Growth Pro ($79)'}
+                  </button>
+                  <button type="button" disabled={!!busy || data.plan === 'scale'} onClick={() => void checkout('scale')}
+                    className="px-4 py-3 bg-violet-700 text-white rounded-lg text-sm font-bold hover:bg-violet-800 disabled:opacity-50">
+                    {busy === 'scale' ? 'Redirecting…' : 'Upgrade Scale Plus ($149)'}
+                  </button>
+                  <button type="button" disabled={!!busy} onClick={() => void openPortal()}
+                    className="sm:col-span-2 px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-50">
+                    {busy === 'portal' ? 'Opening…' : 'Manage subscription'}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-600">
+                    In-app Stripe checkout is not configured on this server yet. Contact sales for Growth Pro / Scale Plus, or ask an admin to set Stripe price IDs.
+                  </p>
+                  <button type="button" onClick={() => window.open('mailto:sales@snapshop.ai?subject=SnapShop%20billing%20inquiry', '_blank')}
+                    className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700">
+                    Contact sales
+                  </button>
+                </div>
+              )}
+            </>
+          )}
           <button onClick={onClose} className="w-full px-4 py-2 border border-gray-200 bg-white text-gray-700 rounded-lg text-sm font-bold hover:bg-gray-50">Close</button>
         </div>
       </div>
@@ -555,7 +755,7 @@ export default function Settings() {
   const [businessName, setBusinessName] = useState('');
   const [businessEmail, setBusinessEmail] = useState('');
   const [notifications, setNotifications] = useState({
-    inquiries: true, lowStock: false, missedCalls: true, frequency: 'instant',
+    inquiries: true, escalations: true, frequency: 'instant',
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -575,7 +775,12 @@ export default function Settings() {
       setBusinessName(business.name || '');
       setBusinessEmail(business.ownerEmail || '');
       if ((business as any).notifications) {
-        setNotifications((business as any).notifications);
+        const n = (business as any).notifications;
+        setNotifications({
+          inquiries: n.inquiries !== false,
+          escalations: n.escalations !== false,
+          frequency: n.frequency || 'instant',
+        });
       }
       setAiMacros(business.aiMacros ?? []);
     }
@@ -637,14 +842,14 @@ export default function Settings() {
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const toggle = (key: 'inquiries' | 'lowStock' | 'missedCalls') =>
+  const toggle = (key: 'inquiries' | 'escalations') =>
     setNotifications(prev => ({ ...prev, [key]: !prev[key] }));
 
   const sections = [
     { icon: Lock, label: 'Security', description: 'Manage your password and account security.', panel: 'security' as const },
     { icon: Users, label: 'Team', description: 'Collaborate with agents and admins.', panel: 'team' as const },
     { icon: Globe, label: 'Integrations', description: 'Connect WhatsApp, Instagram, and more.', panel: 'integrations' as const },
-    { icon: CreditCard, label: 'Billing', description: 'Contact sales for plans and limits.', panel: 'billing' as const },
+    { icon: CreditCard, label: 'Billing', description: 'Plans, usage limits, and Stripe checkout.', panel: 'billing' as const },
   ];
 
   const handleDeleteAccount = async () => {
@@ -849,8 +1054,7 @@ export default function Settings() {
         <div className="space-y-5">
           {[
             { key: 'inquiries' as const, icon: Mail, bg: 'bg-blue-50', color: 'text-blue-600', title: 'New Customer Inquiries', desc: 'Get notified when a customer starts a new chat.' },
-            { key: 'lowStock' as const, icon: AlertTriangle, bg: 'bg-amber-50', color: 'text-amber-600', title: 'Low Stock Warnings', desc: 'Receive alerts when product inventory is low.' },
-            { key: 'missedCalls' as const, icon: PhoneCall, bg: 'bg-rose-50', color: 'text-rose-600', title: 'Missed Calls', desc: 'Get an email summary of any missed customer calls.' },
+            { key: 'escalations' as const, icon: AlertTriangle, bg: 'bg-amber-50', color: 'text-amber-600', title: 'Human Escalations', desc: 'Email when AI hands a conversation to your team.' },
           ].map(item => (
             <div key={item.key} className="flex items-center justify-between py-2">
               <div className="flex items-center gap-4">
@@ -904,6 +1108,12 @@ export default function Settings() {
         ))}
       </motion.div>
 
+      {/* Legal */}
+      <motion.div className="flex flex-wrap gap-4 text-sm text-gray-500" variants={staggerItem}>
+        <Link to="/privacy" className="hover:text-indigo-600 underline-offset-2 hover:underline">Privacy Policy</Link>
+        <Link to="/terms" className="hover:text-indigo-600 underline-offset-2 hover:underline">Terms of Service</Link>
+      </motion.div>
+
       {/* Danger Zone */}
       <motion.div
         className="bg-red-50 p-6 rounded-xl border border-red-100 flex items-center justify-between"
@@ -926,8 +1136,8 @@ export default function Settings() {
         {activePanel === 'security' && (
           <SecurityPanel onClose={() => setActivePanel(null)} />
         )}
-        {activePanel === 'billing' && (
-          <BillingPanel onClose={() => setActivePanel(null)} />
+        {activePanel === 'billing' && businessId && (
+          <BillingPanel businessId={businessId} onClose={() => setActivePanel(null)} />
         )}
         {activePanel === 'team' && businessId && (
           <TeamPanel businessId={businessId} onClose={() => setActivePanel(null)} />

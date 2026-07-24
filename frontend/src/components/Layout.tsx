@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   LayoutDashboard, MessageSquare, Users, Settings, LogOut,
-  Bot, TrendingUp, Megaphone, User, ChevronDown, KeyRound, AlertTriangle, RefreshCw
+  Bot, TrendingUp, Megaphone, User, ChevronDown, KeyRound, AlertTriangle, RefreshCw, Shield
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { logout } from '../services/authService';
@@ -32,6 +32,7 @@ export default function Layout({ children }: LayoutProps) {
     { icon: Bot,             label: 'AI Settings',   path: '/ai-settings' },
     { icon: TrendingUp,      label: 'Analytics',     path: '/analytics' },
     { icon: Settings,        label: 'Settings',      path: '/settings' },
+    { icon: Shield,          label: 'Admin',         path: '/admin' },
   ];
 
   // Close dropdown when clicking outside

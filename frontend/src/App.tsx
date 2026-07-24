@@ -16,6 +16,9 @@ const CRM = lazy(() => import('./pages/CRM'));
 const Analytics = lazy(() => import('./pages/Analytics'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Join = lazy(() => import('./pages/Join'));
+const Privacy = lazy(() => import('./pages/Privacy'));
+const Terms = lazy(() => import('./pages/Terms'));
+const Admin = lazy(() => import('./pages/Admin'));
 
 function AnimatedRoutes() {
   const location = useLocation();
@@ -71,6 +74,21 @@ function AnimatedRoutes() {
         <Route path="/join" element={
           <motion.div className="w-full" initial="initial" animate="animate" exit="exit" variants={pageTransition}>
             <Join />
+          </motion.div>
+        } />
+        <Route path="/privacy" element={
+          <motion.div className="w-full" initial="initial" animate="animate" exit="exit" variants={pageTransition}>
+            <Privacy />
+          </motion.div>
+        } />
+        <Route path="/terms" element={
+          <motion.div className="w-full" initial="initial" animate="animate" exit="exit" variants={pageTransition}>
+            <Terms />
+          </motion.div>
+        } />
+        <Route path="/admin" element={
+          <motion.div className="w-full" initial="initial" animate="animate" exit="exit" variants={pageTransition}>
+            <Admin />
           </motion.div>
         } />
       </Routes>

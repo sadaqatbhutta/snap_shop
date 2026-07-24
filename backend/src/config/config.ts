@@ -22,8 +22,9 @@ const ConfigSchema = z.object({
   REDIS_URL: z.string().default('redis://localhost:6379'),
 
   WEBHOOK_VERIFY_TOKEN: z.string().min(1, 'WEBHOOK_VERIFY_TOKEN is required'),
-  WHATSAPP_PHONE_NUMBER_ID: z.string().min(1, 'WHATSAPP_PHONE_NUMBER_ID is required'),
-  META_ACCESS_TOKEN: z.string().min(1, 'META_ACCESS_TOKEN is required'),
+  /** Global Meta fallbacks — prefer per-business credentials in multi-tenant production. */
+  WHATSAPP_PHONE_NUMBER_ID: z.string().default(''),
+  META_ACCESS_TOKEN: z.string().default(''),
 
   EMR_API_URL: z.string().url().default('https://emr.example.com'),
   EMR_API_KEY: z.string().optional(),
@@ -38,9 +39,30 @@ const ConfigSchema = z.object({
   RATE_LIMIT_AI_MAX_REQ: z.coerce.number().default(30),
   RATE_LIMIT_EMR_MAX_REQ: z.coerce.number().default(10),
 
-  SMTP_API_URL: z.string().optional(),
+  SMTP_API_URL: z.preprocess(
+    v => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+    z.string().url().optional()
+  ),
+  SMTP_API_KEY: z.string().optional(),
+  SMTP_FROM_EMAIL: z.string().email().optional(),
   APP_URL: z.string().url().default('http://localhost:5173'),
   TIKTOK_WEBHOOK_SECRET: z.string().optional(),
+
+  STRIPE_SECRET_KEY: z.preprocess(
+    v => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+    z.string().optional()
+  ),
+  STRIPE_WEBHOOK_SECRET: z.preprocess(
+    v => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+    z.string().optional()
+  ),
+  STRIPE_PRICE_GROWTH: z.string().optional(),
+  STRIPE_PRICE_SCALE: z.string().optional(),
+
+  SENTRY_DSN: z.preprocess(
+    v => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+    z.string().url().optional()
+  ),
 
   /** Required in staging/production to access GET /api/logs and GET /api/metrics (via X-Observability-Key). */
   OBSERVABILITY_KEY: z.preprocess(

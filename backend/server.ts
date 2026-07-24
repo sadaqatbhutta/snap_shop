@@ -4,8 +4,11 @@ import { logger } from './src/utils/logger.js';
 import { fileURLToPath } from 'url';
 import { startWorkers } from './worker.js';
 import { getQueueRuntimeInfo } from './src/queues/queue.js';
+import { initBackendSentry } from './src/utils/sentry.js';
 
 async function startServer() {
+  await initBackendSentry();
+
   const queueRuntime = getQueueRuntimeInfo();
   const strictQueueMode = config.QUEUE_STRICT_MODE && config.NODE_ENV !== 'development' && config.NODE_ENV !== 'test';
   const inlineWorkersEnabled =

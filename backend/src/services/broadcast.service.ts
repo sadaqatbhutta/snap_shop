@@ -4,8 +4,11 @@ import { buildError } from '../utils/errors.js';
 import { sendMessage } from './channelSender.js';
 import { logger } from '../utils/logger.js';
 import { Job } from 'bullmq';
+import { assertWithinPlanLimit, incrementUsage } from './usage.service.js';
 
 export async function scheduleBroadcast(broadcastId: string, businessId: string, scheduledAt?: string, requestId?: string) {
+  await assertWithinPlanLimit(businessId, 'broadcasts');
+
   const broadcastRef = db.doc(`businesses/${businessId}/broadcasts/${broadcastId}`);
   const broadcastSnap = await broadcastRef.get();
 
@@ -36,6 +39,8 @@ export async function scheduleBroadcast(broadcastId: string, businessId: string,
     queuedJobId: String(job.id),
     updatedAt: new Date().toISOString(),
   });
+
+  await incrementUsage(businessId, 'broadcasts');
 
   return {
     status: 'queued',

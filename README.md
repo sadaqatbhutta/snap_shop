@@ -159,6 +159,18 @@ The widget posts messages to `/api/webchat/message`, which flows into the same A
 
 ---
 
+## Production SaaS features
+
+- **Per-business channel credentials** — Settings → Integrations (saved via `PUT /api/business/:id/integrations`)
+- **Billing** — Free / Growth Pro / Scale Plus / Enterprise with usage metering; Stripe Checkout + Customer Portal when `STRIPE_*` env vars are set (`/api/billing/...`, webhook `POST /api/billing/webhook`)
+- **Plan limits** — monthly messages, AI calls, broadcasts, and agent seats enforced in workers/API
+- **Email** — SendGrid-compatible invites + inquiry/escalation alerts when `SMTP_API_URL` (+ `SMTP_API_KEY` for SendGrid) is set
+- **Legal** — `/privacy` and `/terms`
+- **Platform admin** — `/admin` (requires Firestore `admins/{uid}`)
+- **Observability** — `/api/health` reports billing/email/EMR/meta fallback configuration; optional `SENTRY_DSN` / `VITE_SENTRY_DSN`
+
+---
+
 ## Deployment Safety Checklist
 
 Use this checklist before pushing to staging/production:

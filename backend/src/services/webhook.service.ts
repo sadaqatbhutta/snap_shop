@@ -9,6 +9,9 @@ import { WebhookPayload } from '../validations/webhook.js';
 import { runAIPipeline } from './ai.service.js';
 import { deriveConversationSignals } from '../utils/conversationSignals.js';
 import { redactForLogs } from '../utils/redact.js';
+import { assertWithinPlanLimit, incrementUsage } from './usage.service.js';
+import { notifyBusinessOwners } from './notification.service.js';
+import { AppError } from '../utils/errors.js';
 
 export async function enqueueWebhookMessage(channel: string, body: Record<string, unknown>, requestId?: string) {
   return webhookQueue.add(
@@ -37,6 +40,13 @@ export async function processWebhookJob(channel: string, body: Record<string, un
 
   if (await isDuplicate(msgId)) {
     return { status: 'duplicate', id: msgId };
+  }
+
+  try {
+    await assertWithinPlanLimit(businessId, 'messages');
+  } catch (err) {
+    logger.warn({ businessId, err }, 'Message plan limit reached');
+    throw err;
   }
 
   // ─── Transaction: Find/Create Customer & Conversation ────────────────────
@@ -156,26 +166,51 @@ export async function processWebhookJob(channel: string, body: Record<string, un
 
   // ─── AI Processing (only if not human-escalated) ─────────────────────────
   if (!isHumanHandling) {
-    const aiResult = await runAIPipeline(content, businessId, history);
-    aiReply = aiResult.reply;
-    aiIntent = aiResult.intent;
-    aiConfidence = aiResult.confidence;
-    shouldEscalate = aiResult.shouldEscalate;
+    try {
+      await assertWithinPlanLimit(businessId, 'aiCalls');
+      const aiResult = await runAIPipeline(content, businessId, history);
+      aiReply = aiResult.reply;
+      aiIntent = aiResult.intent;
+      aiConfidence = aiResult.confidence;
+      shouldEscalate = aiResult.shouldEscalate;
+      await incrementUsage(businessId, 'aiCalls');
 
-    const aiMsgId = uuidv4();
-    await messagesRef.doc(aiMsgId).set({
-      id: aiMsgId,
-      conversationId,
+      const aiMsgId = uuidv4();
+      await messagesRef.doc(aiMsgId).set({
+        id: aiMsgId,
+        conversationId,
+        businessId,
+        senderId: 'ai',
+        senderType: 'ai',
+        content: aiReply,
+        type: 'text',
+        intent: aiIntent,
+        timestamp: new Date().toISOString(),
+      });
+
+      await sendMessage(channel, userId, aiReply, businessId);
+    } catch (err: any) {
+      if (err instanceof AppError && err.code === 'PLAN_LIMIT_REACHED') {
+        aiReply = 'Our AI assistant is temporarily unavailable. A team member will follow up shortly.';
+        shouldEscalate = true;
+        logger.warn({ businessId }, 'AI plan limit reached; escalating');
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  await incrementUsage(businessId, 'messages');
+
+  if (isNewConversation) {
+    void notifyBusinessOwners({
       businessId,
-      senderId: 'ai',
-      senderType: 'ai',
-      content: aiReply,
-      type: 'text',
-      intent: aiIntent,
-      timestamp: new Date().toISOString(),
+      kind: 'inquiry',
+      customerName: payload.name || userId,
+      channel,
+      preview: content,
+      conversationId,
     });
-
-    await sendMessage(channel, userId, aiReply, businessId);
   }
 
   const finalStatus: 'active' | 'human_escalated' =
@@ -196,6 +231,17 @@ export async function processWebhookJob(channel: string, body: Record<string, un
   if (finalStatus === 'human_escalated') convPatch.status = 'human_escalated';
 
   await db.doc(`businesses/${businessId}/conversations/${conversationId}`).update(convPatch);
+
+  if (!isHumanHandling && shouldEscalate) {
+    void notifyBusinessOwners({
+      businessId,
+      kind: 'escalation',
+      customerName: payload.name || userId,
+      channel,
+      preview: content,
+      conversationId,
+    });
+  }
 
   logger.info(
     { channel, userId, businessId, intent: aiIntent, confidence: aiConfidence ?? null, leadPriority: signals.leadPriority },

@@ -83,7 +83,7 @@ service cloud.firestore {
     function isValidCustomer(data) {
       return data.keys().hasAll(['name', 'channel', 'externalId', 'createdAt']) &&
              data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             data.channel in ['whatsapp', 'instagram', 'facebook', 'webchat'] &&
+             data.channel in ['whatsapp', 'instagram', 'facebook', 'webchat', 'tiktok'] &&
              data.externalId is string && data.externalId.size() > 0 && data.externalId.size() < 50;
     }
 
@@ -118,7 +118,7 @@ service cloud.firestore {
              data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
              data.templateId is string &&
              data.segmentId is string &&
-             data.status in ['draft', 'scheduled', 'sending', 'sent', 'failed'];
+             data.status in ['draft', 'scheduled', 'sending', 'sent', 'failed', 'cancelled'];
     }
 
     // ===============================================================
@@ -179,6 +179,12 @@ service cloud.firestore {
         allow read: if isBusinessOwner(businessId) || isAgent(businessId);
         allow write: if false; // Stats are only written by backend
       }
+    }
+
+    // Platform admin roster (manual create in Firebase Console only)
+    match /admins/{adminId} {
+      allow read: if isAuthenticated() && request.auth.uid == adminId;
+      allow write: if false;
     }
 
     // Default deny
