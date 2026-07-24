@@ -1,20 +1,12 @@
 import { queryLogs } from '../utils/logStore.js';
 import { getMetrics as getMetricsInternal } from '../utils/metrics.js';
-import { emrQueue, webhookQueue, broadcastQueue, getQueueRuntimeInfo } from '../queues/queue.js';
+import { webhookQueue, broadcastQueue, digestQueue, getQueueRuntimeInfo } from '../queues/queue.js';
 import { config } from '../config/config.js';
 import { isBillingConfigured } from './billing.service.js';
 import { isEmailConfigured } from './email.service.js';
 
-/** True when EMR_API_URL points at a real host (not template .example.com defaults). */
-export function isEmrIntegrationConfigured(): boolean {
-  try {
-    const host = new URL(config.EMR_API_URL).hostname.toLowerCase();
-    if (host === 'emr.example.com') return false;
-    if (host.endsWith('.example.com')) return false;
-    return true;
-  } catch {
-    return false;
-  }
+export function isMetaOAuthConfigured(): boolean {
+  return Boolean(config.META_APP_ID && config.META_APP_SECRET);
 }
 
 export function queryLogsForDashboard(query: Record<string, unknown>) {
@@ -40,15 +32,16 @@ export function runtimeCheck() {
     queueHealthy: queueRuntime.healthy,
     billingConfigured: isBillingConfigured(),
     emailConfigured: isEmailConfigured(),
+    metaOAuthConfigured: isMetaOAuthConfigured(),
   };
 }
 
 export async function healthCheck() {
   const queueRuntime = getQueueRuntimeInfo();
-  const [emrWaiting, webhookWaiting, broadcastWaiting] = await Promise.allSettled([
-    emrQueue.getWaitingCount(),
+  const [webhookWaiting, broadcastWaiting, digestWaiting] = await Promise.allSettled([
     webhookQueue.getWaitingCount(),
     broadcastQueue.getWaitingCount(),
+    digestQueue.getWaitingCount(),
   ]);
 
   return {
@@ -57,15 +50,15 @@ export async function healthCheck() {
     uptime_s: Math.floor(process.uptime()),
     queueRuntime,
     integrations: {
-      emr: { configured: isEmrIntegrationConfigured() },
       billing: { configured: isBillingConfigured() },
       email: { configured: isEmailConfigured() },
+      metaOAuth: { configured: isMetaOAuthConfigured() },
       metaFallback: { configured: Boolean(config.META_ACCESS_TOKEN && config.WHATSAPP_PHONE_NUMBER_ID) },
     },
     queues: {
-      emr: emrWaiting.status === 'fulfilled' ? { waiting: emrWaiting.value } : { error: 'unavailable' },
       webhook: webhookWaiting.status === 'fulfilled' ? { waiting: webhookWaiting.value } : { error: 'unavailable' },
       broadcast: broadcastWaiting.status === 'fulfilled' ? { waiting: broadcastWaiting.value } : { error: 'unavailable' },
+      digest: digestWaiting.status === 'fulfilled' ? { waiting: digestWaiting.value } : { error: 'unavailable' },
     },
   };
 }

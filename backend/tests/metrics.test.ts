@@ -6,17 +6,17 @@ describe('Metrics', () => {
   beforeEach(() => resetMetrics());
 
   it('counts total requests', () => {
-    recordRequest('/api/emr/post', 200, 100);
-    recordRequest('/api/emr/post', 200, 150);
+    recordRequest('/api/billing/webhook', 200, 100);
+    recordRequest('/api/billing/webhook', 200, 150);
     const m = getMetrics();
     expect(m.global.total_requests).toBe(2);
     expect(m.global.total_failures).toBe(0);
   });
 
   it('counts failures for 4xx and 5xx', () => {
-    recordRequest('/api/emr/post', 200, 100);
-    recordRequest('/api/emr/post', 500, 200);
-    recordRequest('/api/emr/post', 422, 50);
+    recordRequest('/api/billing/webhook', 200, 100);
+    recordRequest('/api/billing/webhook', 500, 200);
+    recordRequest('/api/billing/webhook', 422, 50);
     const m = getMetrics();
     expect(m.global.total_failures).toBe(2);
   });
@@ -36,15 +36,15 @@ describe('Metrics', () => {
   });
 
   it('tracks per-endpoint breakdown', () => {
-    recordRequest('/api/emr/post', 200, 80);
+    recordRequest('/api/billing/webhook', 200, 80);
     recordRequest('/api/webhook/whatsapp', 200, 120);
-    recordRequest('/api/emr/post', 500, 300);
+    recordRequest('/api/billing/webhook', 500, 300);
     const m = getMetrics();
-    const emr = m.endpoints.find(e => e.path === '/api/emr/post');
-    expect(emr).toBeDefined();
-    expect(emr?.requests).toBe(2);
-    expect(emr?.failures).toBe(1);
-    expect(emr?.error_rate).toBe(0.5);
+    const billing = m.endpoints.find(e => e.path === '/api/billing/webhook');
+    expect(billing).toBeDefined();
+    expect(billing?.requests).toBe(2);
+    expect(billing?.failures).toBe(1);
+    expect(billing?.error_rate).toBe(0.5);
   });
 
   it('returns zero metrics when no requests recorded', () => {
@@ -57,7 +57,7 @@ describe('Metrics', () => {
 
 describe('Logger queryLogs', () => {
   it('filters by failure status', () => {
-    pushLog({ timestamp: new Date().toISOString(), level: 'error', path: '/api/emr/post', status_code: 500 });
+    pushLog({ timestamp: new Date().toISOString(), level: 'error', path: '/api/billing/webhook', status_code: 500 });
     pushLog({ timestamp: new Date().toISOString(), level: 'info', path: '/api/health', status_code: 200 });
     const results = queryLogs({ status: 'failure' });
     expect(results.every(e => e.level === 'error' || (e.status_code !== undefined && e.status_code >= 400))).toBe(true);
@@ -70,10 +70,10 @@ describe('Logger queryLogs', () => {
   });
 
   it('filters by endpoint path fragment', () => {
-    pushLog({ timestamp: new Date().toISOString(), level: 'info', path: '/api/emr/post', status_code: 200 });
+    pushLog({ timestamp: new Date().toISOString(), level: 'info', path: '/api/billing/webhook', status_code: 200 });
     pushLog({ timestamp: new Date().toISOString(), level: 'info', path: '/api/webhook/wa', status_code: 200 });
-    const results = queryLogs({ endpoint: '/emr' });
-    expect(results.every(e => e.path?.includes('/emr'))).toBe(true);
+    const results = queryLogs({ endpoint: '/billing' });
+    expect(results.every(e => e.path?.includes('/billing'))).toBe(true);
   });
 
   it('respects limit parameter', () => {

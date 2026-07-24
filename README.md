@@ -161,13 +161,17 @@ The widget posts messages to `/api/webchat/message`, which flows into the same A
 
 ## Production SaaS features
 
-- **Per-business channel credentials** — Settings → Integrations (saved via `PUT /api/business/:id/integrations`)
-- **Billing** — Free / Growth Pro / Scale Plus / Enterprise with usage metering; Stripe Checkout + Customer Portal when `STRIPE_*` env vars are set (`/api/billing/...`, webhook `POST /api/billing/webhook`)
-- **Plan limits** — monthly messages, AI calls, broadcasts, and agent seats enforced in workers/API
+- **Per-business channel credentials** — Settings → Integrations (saved via `PUT /api/business/:id/integrations` into `businesses/{id}/private/credentials`; client cannot read tokens)
+- **Channel tenant routing** — Meta `phone_number_id` / page ids map to SnapShop businesses via `channel_bindings/{channel:externalId}`
+- **Billing** — Free / Growth Pro / Scale Plus / Enterprise with usage metering; Stripe Checkout + Customer Portal when `STRIPE_*` env vars are set (`/api/billing/...`, webhook `POST /api/billing/webhook`). Client cannot forge `billing` / `usage` fields (Firestore rules).
+- **Plan limits** — monthly messages, AI calls, broadcasts, and agent seats enforced on webhooks, agent send, AI routes, and invites
 - **Email** — SendGrid-compatible invites + inquiry/escalation alerts when `SMTP_API_URL` (+ `SMTP_API_KEY` for SendGrid) is set
 - **Legal** — `/privacy` and `/terms`
 - **Platform admin** — `/admin` (requires Firestore `admins/{uid}`)
-- **Observability** — `/api/health` reports billing/email/EMR/meta fallback configuration; optional `SENTRY_DSN` / `VITE_SENTRY_DSN`
+- **Observability** — `/api/health` reports billing/email/meta OAuth/meta fallback; optional `SENTRY_DSN` / `VITE_SENTRY_DSN`
+- **Meta OAuth** — Settings → Integrations → Connect with Meta (`META_APP_ID` + `META_APP_SECRET`)
+- **Digest emails** — daily/weekly notification digests via BullMQ `digest` worker
+- **Per-tenant webhook secrets** — rotate from Integrations for `X-Snap-Signature`
 
 ---
 
@@ -180,8 +184,7 @@ Use this checklist before pushing to staging/production:
 - Set `QUEUE_STRICT_MODE=true` so startup fails fast if Redis is unavailable.
 - Run workers (`npm run worker`) or enable controlled inline workers only when intended.
 - Confirm `GET /api/health` returns `queueRuntime.mode = "redis"` and `status = "ok"`.
-- Verify required secrets are present: `GEMINI_API_KEY`, `WEBHOOK_SECRET`, `META_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, Firebase service credentials.
-- Replace placeholder EMR settings: `GET /api/health` includes `integrations.emr.configured`; it is `false` while `EMR_API_URL` uses a `*.example.com` host.
+- Verify required secrets are present: `GEMINI_API_KEY`, `WEBHOOK_SECRET`, `META_ACCESS_TOKEN` (or per-business OAuth), Firebase service credentials.
 - Set `OBSERVABILITY_KEY` (16+ characters) on the server and call `GET /api/logs` / `GET /api/metrics` with header `X-Observability-Key: <same value>`. Without this key in staging/production, those endpoints return 403.
 
 ### Single-origin vs split-origin

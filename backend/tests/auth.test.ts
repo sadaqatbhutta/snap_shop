@@ -10,6 +10,11 @@ vi.mock('../src/config/firebase.js', () => ({
       throw new Error('Invalid token');
     }),
   },
+  db: {
+    doc: () => ({
+      get: async () => ({ exists: false }),
+    }),
+  },
 }));
 
 import { createApp } from '../app.js';
@@ -22,18 +27,17 @@ beforeAll(async () => {
 
 describe('Auth middleware', () => {
   it('rejects requests without authorization header', async () => {
-    const res = await request(app).post('/api/emr/post').send({ path: '/test', payload: {} });
+    const res = await request(app).get('/api/admin/me');
     expect(res.status).toBe(401);
     expect(res.body.code).toBe('UNAUTHORIZED');
   });
 
   it('accepts valid Firebase token', async () => {
     const res = await request(app)
-      .post('/api/emr/post')
-      .set('Authorization', 'Bearer valid-token')
-      .send({ path: '/patients', payload: { name: 'John' } });
+      .get('/api/admin/me')
+      .set('Authorization', 'Bearer valid-token');
 
-    expect(res.status).toBe(202);
-    expect(res.body.status).toBe('queued');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('isPlatformAdmin');
   });
 });

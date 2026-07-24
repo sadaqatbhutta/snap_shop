@@ -30,16 +30,25 @@ export interface Business {
   confidenceThreshold: number;
   onboarding?: OnboardingProgress;
   aiMacros?: AIMacro[];
-  metaAccessToken?: string | null;
+  /** Public routing ids only — access tokens live in private/credentials (Admin SDK). */
   whatsappPhoneNumberId?: string | null;
-  tiktokAccessToken?: string | null;
-  tiktokApiBase?: string | null;
-  tiktokSendPath?: string | null;
+  facebookPageId?: string | null;
+  instagramPageId?: string | null;
+  metaPageId?: string | null;
+  tiktokBusinessId?: string | null;
+  integrationsConfigured?: {
+    meta?: boolean;
+    whatsapp?: boolean;
+    facebook?: boolean;
+    instagram?: boolean;
+    tiktok?: boolean;
+  };
   notifications?: {
     inquiries?: boolean;
     escalations?: boolean;
     frequency?: 'instant' | 'daily' | 'weekly' | string;
   };
+  /** Server-owned — readable for UI, not client-writable (Firestore rules). */
   billing?: {
     plan?: 'free' | 'growth' | 'scale' | 'enterprise';
     status?: string;

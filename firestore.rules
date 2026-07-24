@@ -2,82 +2,45 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ===============================================================
-    // Assumed Data Model
-    // ===============================================================
-    //
-    // Collection: /businesses/{businessId}
-    // Document ID: businessId (unique ID)
-    // Fields:
-    //   - name: string (required) - Business name
-    //   - ownerEmail: string (required) - Owner's email
-    //   - createdAt: timestamp (required) - Creation time
-    //
-    // Collection: /businesses/{businessId}/customers/{customerId}
-    // Document ID: customerId (unique ID)
-    // Fields:
-    //   - name: string (required) - Customer name
-    //   - channel: string (required, enum) - whatsapp, instagram, etc.
-    //   - externalId: string (required) - Phone/Social ID
-    //
-    // Collection: /businesses/{businessId}/conversations/{conversationId}
-    // Document ID: conversationId (unique ID)
-    // Fields:
-    //   - customerId: string (required) - Customer ID
-    //   - status: string (required, enum) - active, escalated, closed
-    //
-    // Collection: /businesses/{businessId}/agents/{agentId}
-    // Document ID: agentId (unique ID)
-    // Fields:
-    //   - name: string (required) - Agent name
-    //   - email: string (required) - Agent email
-    //   - role: string (required, enum) - admin, agent
-    //
-    // ===============================================================
-
-    // ===============================================================
-    // Helper Functions
-    // ===============================================================
-    
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    function isEmailVerified() {
-      return isAuthenticated() && request.auth.token.email_verified == true;
-    }
-
-    // Note: Platform admin documents must be manually created via the Firebase Console.
-    // They should never be created via the client SDK.
     function isPlatformAdmin() {
       return exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
     function isBusinessOwner(businessId) {
-      return isAuthenticated() && 
+      return isAuthenticated() &&
         (businessId == request.auth.uid ||
          get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerEmail == request.auth.token.email ||
          isPlatformAdmin());
     }
 
     function isAgent(businessId) {
-      return isAuthenticated() && 
+      return isAuthenticated() &&
         exists(/databases/$(database)/documents/businesses/$(businessId)/agents/$(request.auth.uid));
     }
 
     function isAdmin(businessId) {
-      return isBusinessOwner(businessId) || 
+      return isBusinessOwner(businessId) ||
         (isAgent(businessId) && get(/databases/$(database)/documents/businesses/$(businessId)/agents/$(request.auth.uid)).data.role == 'admin');
     }
 
-    // ===============================================================
-    // Validation Functions
-    // ===============================================================
+    // Client may only touch product/config fields — never billing, usage, or channel secrets.
+    function clientSafeBusinessKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly([
+          'name', 'description', 'aiContext', 'faqs', 'confidenceThreshold',
+          'onboarding', 'aiMacros', 'notifications', 'ownerEmail', 'updatedAt'
+        ]);
+    }
 
-    function isValidBusiness(data) {
-      return data.keys().hasAll(['name', 'ownerEmail', 'createdAt']) &&
-             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             data.ownerEmail is string && data.ownerEmail.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    function createOmitsServerFields() {
+      return !request.resource.data.keys().hasAny([
+        'billing', 'usage', 'metaAccessToken', 'tiktokAccessToken',
+        'tiktokApiBase', 'tiktokSendPath'
+      ]);
     }
 
     function isValidCustomer(data) {
@@ -97,7 +60,7 @@ service cloud.firestore {
       return data.keys().hasAll(['senderId', 'senderType', 'content', 'type', 'timestamp']) &&
              data.senderType in ['customer', 'agent', 'ai'] &&
              data.content is string && data.content.size() < 5000 &&
-             data.type in ['text', 'image', 'voice'];
+             data.type in ['text', 'image', 'audio', 'video', 'document', 'sticker', 'location', 'contacts', 'interactive', 'voice'];
     }
 
     function isValidSegment(data) {
@@ -121,16 +84,20 @@ service cloud.firestore {
              data.status in ['draft', 'scheduled', 'sending', 'sent', 'failed', 'cancelled'];
     }
 
-    // ===============================================================
-    // Match Rules
-    // ===============================================================
-
     match /businesses/{businessId} {
       allow read: if isAuthenticated() && (businessId == request.auth.uid || isBusinessOwner(businessId) || isAgent(businessId));
-      allow create: if isAuthenticated() && 
-                    (request.resource.data.ownerEmail == request.auth.token.email || isPlatformAdmin());
-      allow update: if isAuthenticated() && (businessId == request.auth.uid || isBusinessOwner(businessId));
+      allow create: if isAuthenticated() &&
+                    (request.resource.data.ownerEmail == request.auth.token.email || isPlatformAdmin()) &&
+                    createOmitsServerFields();
+      allow update: if isAuthenticated() &&
+                    (businessId == request.auth.uid || isBusinessOwner(businessId)) &&
+                    clientSafeBusinessKeys();
       allow delete: if isBusinessOwner(businessId);
+
+      // Channel secrets — Admin SDK only
+      match /private/{docId} {
+        allow read, write: if false;
+      }
 
       match /customers/{customerId} {
         allow read: if isBusinessOwner(businessId) || isAgent(businessId);
@@ -177,17 +144,25 @@ service cloud.firestore {
 
       match /stats/{statId} {
         allow read: if isBusinessOwner(businessId) || isAgent(businessId);
-        allow write: if false; // Stats are only written by backend
+        allow write: if false;
+      }
+
+      match /digest_events/{eventId} {
+        allow read: if isBusinessOwner(businessId) || isAdmin(businessId);
+        allow write: if false;
       }
     }
 
-    // Platform admin roster (manual create in Firebase Console only)
+    // Provider ID → businessId map (Admin SDK only)
+    match /channel_bindings/{bindingId} {
+      allow read, write: if false;
+    }
+
     match /admins/{adminId} {
       allow read: if isAuthenticated() && request.auth.uid == adminId;
       allow write: if false;
     }
 
-    // Default deny
     match /{document=**} {
       allow read, write: if false;
     }

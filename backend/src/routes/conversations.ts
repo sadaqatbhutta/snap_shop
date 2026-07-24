@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
 import { buildError } from '../utils/errors.js';
 import { verifyFirebaseToken, verifyBusinessAccess } from '../middlewares/auth.js';
+import { assertWithinPlanLimit, incrementUsage } from '../services/usage.service.js';
 
 export const conversationsRouter = Router();
 
@@ -21,18 +22,12 @@ const SendMessageSchema = z.object({
  *
  * Send an agent message to a customer via their channel (WhatsApp/Instagram/Facebook).
  * This is called from the frontend when an agent types a reply in the dashboard.
- *
- * Body:
- * {
- *   "conversationId": "conv-uuid",
- *   "businessId": "biz-uuid",
- *   "content": "Hello, how can I help?",
- *   "senderId": "agent-firebase-uid"
- * }
  */
 conversationsRouter.post('/send', verifyFirebaseToken, verifyBusinessAccess, async (req, res, next) => {
   try {
     const { conversationId, businessId, content, senderId } = SendMessageSchema.parse(req.body);
+
+    await assertWithinPlanLimit(businessId, 'messages');
 
     // ─── Fetch Conversation ───────────────────────────────────────────────
     const convRef = db.doc(`businesses/${businessId}/conversations/${conversationId}`);
@@ -83,6 +78,7 @@ conversationsRouter.post('/send', verifyFirebaseToken, verifyBusinessAccess, asy
 
     // ─── Send Message to Customer via Channel ─────────────────────────────
     await sendMessage(channel, recipientId, content, businessId);
+    await incrementUsage(businessId, 'messages');
 
     logger.info({
       conversationId,

@@ -1,7 +1,7 @@
-import { createWorker, EMRJobData, WebhookJobData, BroadcastJobData } from './src/queues/queue.js';
-import { getEMRJobProcessor } from './src/services/emr.service.js';
+import { createWorker, WebhookJobData, BroadcastJobData, DigestJobData } from './src/queues/queue.js';
 import { processWebhookJob } from './src/services/webhook.service.js';
 import { processBroadcastJob } from './src/services/broadcast.service.js';
+import { processDigestJob, scheduleDigestJobs } from './src/services/notification.service.js';
 import { logger } from './src/utils/logger.js';
 import { fileURLToPath } from 'url';
 
@@ -10,11 +10,6 @@ let workersStarted = false;
 export function startWorkers() {
   if (workersStarted) return;
   workersStarted = true;
-
-  createWorker<EMRJobData>('emr', async job => {
-    logger.info({ queue: 'emr', job_id: job.id, event: 'processing', request_id: job.data.requestId, path: job.data.path }, 'EMR job started');
-    return getEMRJobProcessor(job.data);
-  });
 
   createWorker<WebhookJobData>('webhook', async job => {
     logger.info({ queue: 'webhook', job_id: job.id, event: 'processing', request_id: job.data.requestId, channel: job.data.channel }, 'Webhook job started');
@@ -26,7 +21,14 @@ export function startWorkers() {
     return processBroadcastJob(job.data);
   });
 
-  logger.info({ message: 'BullMQ workers started', queues: ['emr', 'webhook', 'broadcast'] });
+  createWorker<DigestJobData>('digest', async job => {
+    logger.info({ queue: 'digest', job_id: job.id, frequency: job.data.frequency }, 'Digest job started');
+    return processDigestJob(job.data.frequency);
+  });
+
+  void scheduleDigestJobs();
+
+  logger.info({ message: 'BullMQ workers started', queues: ['webhook', 'broadcast', 'digest'] });
 }
 
 const __filename = fileURLToPath(import.meta.url);

@@ -12,6 +12,7 @@ import { redactForLogs } from '../utils/redact.js';
 import { assertWithinPlanLimit, incrementUsage } from './usage.service.js';
 import { notifyBusinessOwners } from './notification.service.js';
 import { AppError } from '../utils/errors.js';
+import { resolveBusinessId } from './tenantResolver.service.js';
 
 export async function enqueueWebhookMessage(channel: string, body: Record<string, unknown>, requestId?: string) {
   return webhookQueue.add(
@@ -33,7 +34,16 @@ export async function processWebhookJob(channel: string, body: Record<string, un
   }
 
   const msgId = payload.message_id || uuidv4();
-  const businessId = payload.business_id;
+  const resolvedBusinessId = await resolveBusinessId(channel, payload.business_id);
+  if (!resolvedBusinessId) {
+    logger.warn(
+      { channel, rawBusinessId: payload.business_id },
+      'No tenant mapping for inbound webhook — configure WhatsApp Phone Number ID / Page ID in Integrations'
+    );
+    return { status: 'unmapped_tenant', rawBusinessId: payload.business_id };
+  }
+
+  const businessId = resolvedBusinessId;
   const userId = payload.user_id;
   const content = payload.message;
   const now = new Date().toISOString();

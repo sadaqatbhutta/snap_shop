@@ -1,20 +1,19 @@
 import axios from 'axios';
-import { db } from '../config/firebase.js';
 import { config } from '../config/config.js';
 import { logger } from '../utils/logger.js';
 import { withRetry } from '../utils/retry.js';
+import { loadBusinessSecrets } from './secrets.service.js';
 
 export async function sendMessage(channel: string, recipientId: string, message: string, businessId: string) {
-  const bizSnap = await db.doc(`businesses/${businessId}`).get();
-  const biz = bizSnap.data() || {};
-  const accessToken = biz.metaAccessToken || config.META_ACCESS_TOKEN;
-  const phoneNumberId = biz.whatsappPhoneNumberId || config.WHATSAPP_PHONE_NUMBER_ID;
+  const secrets = await loadBusinessSecrets(businessId);
+  const accessToken = secrets.metaAccessToken || config.META_ACCESS_TOKEN;
+  const phoneNumberId = secrets.whatsappPhoneNumberId || config.WHATSAPP_PHONE_NUMBER_ID;
   const apiUrl = 'https://graph.facebook.com/v19.0';
 
   if (channel === 'tiktok') {
-    const tiktokAccessToken = biz.tiktokAccessToken || process.env.TIKTOK_ACCESS_TOKEN;
-    const tiktokApiBase = biz.tiktokApiBase || process.env.TIKTOK_API_BASE || 'https://open.tiktokapis.com/v2';
-    const tiktokSendPath = biz.tiktokSendPath || process.env.TIKTOK_SEND_PATH || '/message/send/';
+    const tiktokAccessToken = secrets.tiktokAccessToken || process.env.TIKTOK_ACCESS_TOKEN;
+    const tiktokApiBase = secrets.tiktokApiBase || process.env.TIKTOK_API_BASE || 'https://open.tiktokapis.com/v2';
+    const tiktokSendPath = secrets.tiktokSendPath || process.env.TIKTOK_SEND_PATH || '/message/send/';
     if (!tiktokAccessToken) {
       throw new Error('Missing TikTok access token');
     }
@@ -36,6 +35,12 @@ export async function sendMessage(channel: string, recipientId: string, message:
     }, 'sendTiktokMessage', { maxAttempts: 3, baseDelayMs: 1000 });
 
     logger.info({ channel, recipientId, businessId }, 'Delivered outbound message');
+    return;
+  }
+
+  if (channel === 'webchat') {
+    // Webchat is inbound+dashboard only; no external provider delivery.
+    logger.info({ channel, recipientId, businessId }, 'Skipped outbound delivery for webchat');
     return;
   }
 

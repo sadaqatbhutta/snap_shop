@@ -31,7 +31,9 @@ describe('API Routes', () => {
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('ok');
     expect(res.body.timestamp).toBeTruthy();
-    expect(res.body.integrations?.emr).toMatchObject({ configured: expect.any(Boolean) });
+    expect(res.body.integrations?.billing).toMatchObject({ configured: expect.any(Boolean) });
+    expect(res.body.integrations?.email).toMatchObject({ configured: expect.any(Boolean) });
+    expect(res.body.integrations?.metaOAuth).toMatchObject({ configured: expect.any(Boolean) });
   });
 
   it('queues webhook requests and returns 202', async () => {

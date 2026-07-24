@@ -71,16 +71,6 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
       escalations: true,
       frequency: 'instant',
     },
-    billing: {
-      plan: 'free',
-      status: 'active',
-    },
-    usage: {
-      periodStart: `${new Date().getUTCFullYear()}-${String(new Date().getUTCMonth() + 1).padStart(2, '0')}-01`,
-      messages: 0,
-      aiCalls: 0,
-      broadcasts: 0,
-    },
   }), []);
 
   const loadBusiness = useCallback(async (opts?: { forceLoading?: boolean }) => {

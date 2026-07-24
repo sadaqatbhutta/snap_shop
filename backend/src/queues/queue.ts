@@ -206,9 +206,9 @@ function createQueue<T>(name: string) {
   });
 }
 
-export const emrQueue = createQueue<EMRJobData>('emr');
 export const webhookQueue = createQueue<WebhookJobData>('webhook');
 export const broadcastQueue = createQueue<BroadcastJobData>('broadcast');
+export const digestQueue = createQueue<DigestJobData>('digest');
 
 export function getQueueRuntimeInfo() {
   const mode = connection ? 'redis' : 'in-memory';
@@ -222,12 +222,6 @@ export function getQueueRuntimeInfo() {
 }
 
 // ─── Job Data Types ───────────────────────────────────────────────────────────
-export type EMRJobData = {
-  path: string;
-  payload: unknown;
-  requestId?: string;
-};
-
 export type WebhookJobData = {
   channel: string;
   body: Record<string, unknown>;
@@ -237,6 +231,11 @@ export type WebhookJobData = {
 export type BroadcastJobData = {
   broadcastId: string;
   businessId: string;
+  requestId?: string;
+};
+
+export type DigestJobData = {
+  frequency: 'daily' | 'weekly';
   requestId?: string;
 };
 
@@ -286,9 +285,9 @@ export function createWorker<T>(queueName: string, processor: (job: Job<T>) => P
   if (!connection) {
     logger.warn({ queue: queueName }, 'Using in-memory worker in development');
     const queueMap: Record<string, InMemoryQueue<any>> = {
-      emr: emrQueue as InMemoryQueue<any>,
       webhook: webhookQueue as InMemoryQueue<any>,
       broadcast: broadcastQueue as InMemoryQueue<any>,
+      digest: digestQueue as InMemoryQueue<any>,
     };
     const targetQueue = queueMap[queueName];
     if (targetQueue) {

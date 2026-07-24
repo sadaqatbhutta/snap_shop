@@ -26,9 +26,10 @@ const ConfigSchema = z.object({
   WHATSAPP_PHONE_NUMBER_ID: z.string().default(''),
   META_ACCESS_TOKEN: z.string().default(''),
 
-  EMR_API_URL: z.string().url().default('https://emr.example.com'),
-  EMR_API_KEY: z.string().optional(),
-  EMR_TIMEOUT_MS: z.coerce.number().default(10000),
+  /** Meta OAuth / Facebook Login for Business (optional self-serve connect). */
+  META_APP_ID: z.string().optional(),
+  META_APP_SECRET: z.string().optional(),
+  META_OAUTH_SCOPES: z.string().default('whatsapp_business_management,whatsapp_business_messaging,pages_messaging,pages_show_list,instagram_basic,instagram_manage_messages'),
 
   QUEUE_CONCURRENCY: z.coerce.number().default(5),
   QUEUE_MAX_RETRIES: z.coerce.number().default(3),
@@ -37,7 +38,6 @@ const ConfigSchema = z.object({
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60000),
   RATE_LIMIT_MAX_REQ: z.coerce.number().default(60),
   RATE_LIMIT_AI_MAX_REQ: z.coerce.number().default(30),
-  RATE_LIMIT_EMR_MAX_REQ: z.coerce.number().default(10),
 
   SMTP_API_URL: z.preprocess(
     v => (typeof v === 'string' && v.trim() === '' ? undefined : v),

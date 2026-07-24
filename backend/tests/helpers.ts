@@ -85,7 +85,7 @@ export function createMockFetch(behavior: MockFetchBehavior) {
     if (b.type === 'network_error') throw new Error(b.message);
 
     const status = b.type === 'http_error' ? b.status : ('status' in b ? b.status : undefined) ?? 200;
-    const responseBody = b.type === 'success' ? b.body : { error: 'EMR error' };
+    const responseBody = b.type === 'success' ? b.body : { error: 'upstream error' };
 
     return {
       ok:     status < 400,

@@ -3,76 +3,110 @@ import { Request, Response, NextFunction } from 'express';
 import { config } from '../config/config.js';
 import { buildError } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
+import { loadBusinessSecrets } from '../services/secrets.service.js';
+
+function timingSafeEqualString(a: string, b: string): boolean {
+  const left = Buffer.from(a, 'utf8');
+  const right = Buffer.from(b, 'utf8');
+  if (left.length !== right.length) return false;
+  return crypto.timingSafeEqual(left, right);
+}
+
+function hmacHex(secret: string, rawBody: Buffer): string {
+  return crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+}
+
+/** Resolve candidate secrets: global + optional per-tenant webhookAppSecret / Meta app secret. */
+async function resolveWebhookSecrets(req: Request): Promise<string[]> {
+  const secrets = new Set<string>();
+  if (config.WEBHOOK_SECRET) secrets.add(config.WEBHOOK_SECRET);
+  if (config.META_APP_SECRET) secrets.add(config.META_APP_SECRET);
+
+  const body = req.body as Record<string, unknown> | undefined;
+  const businessId =
+    (typeof body?.business_id === 'string' && body.business_id) ||
+    (typeof body?.businessId === 'string' && body.businessId) ||
+    null;
+
+  if (businessId) {
+    try {
+      const tenant = await loadBusinessSecrets(businessId);
+      if (tenant.webhookAppSecret) secrets.add(tenant.webhookAppSecret);
+    } catch (err) {
+      logger.warn({ err, businessId }, 'Could not load tenant webhook secret');
+    }
+  }
+
+  return [...secrets];
+}
 
 /**
  * Verify Meta's X-Hub-Signature-256 header (for WhatsApp/Instagram/Facebook webhooks)
  * Format: sha256=<hex_signature>
  */
-export function verifyMetaSignature(req: Request, res: Response, next: NextFunction) {
-  const signatureHeader = req.headers['x-hub-signature-256'];
-  
-  if (!signatureHeader || typeof signatureHeader !== 'string') {
-    logger.warn({ headers: req.headers }, 'Missing X-Hub-Signature-256 header');
-    return next(buildError('INVALID_SIGNATURE', 'Missing Meta signature header', 401));
+export async function verifyMetaSignature(req: Request, res: Response, next: NextFunction) {
+  try {
+    const signatureHeader = req.headers['x-hub-signature-256'];
+
+    if (!signatureHeader || typeof signatureHeader !== 'string') {
+      logger.warn({ headers: req.headers }, 'Missing X-Hub-Signature-256 header');
+      return next(buildError('INVALID_SIGNATURE', 'Missing Meta signature header', 401));
+    }
+
+    const rawBody = (req as any).rawBody as Buffer | undefined;
+    if (!rawBody) {
+      return next(buildError('INVALID_SIGNATURE', 'No payload to verify', 401));
+    }
+
+    const parts = signatureHeader.split('=');
+    if (parts.length !== 2 || parts[0] !== 'sha256') {
+      return next(buildError('INVALID_SIGNATURE', 'Invalid signature format', 401));
+    }
+
+    const providedSignature = parts[1];
+    const candidates = await resolveWebhookSecrets(req);
+    const matched = candidates.some(secret => timingSafeEqualString(hmacHex(secret, rawBody), providedSignature));
+
+    if (!matched) {
+      logger.warn({ provided: providedSignature }, 'Meta signature mismatch');
+      return next(buildError('INVALID_SIGNATURE', 'Signature verification failed', 401));
+    }
+
+    next();
+  } catch (err) {
+    next(err);
   }
-
-  const rawBody = (req as any).rawBody as Buffer | undefined;
-  if (!rawBody) {
-    return next(buildError('INVALID_SIGNATURE', 'No payload to verify', 401));
-  }
-
-  // Meta format: "sha256=<hex>"
-  const parts = signatureHeader.split('=');
-  if (parts.length !== 2 || parts[0] !== 'sha256') {
-    return next(buildError('INVALID_SIGNATURE', 'Invalid signature format', 401));
-  }
-
-  const providedSignature = parts[1];
-  const expectedSignature = crypto
-    .createHmac('sha256', config.WEBHOOK_SECRET)
-    .update(rawBody)
-    .digest('hex');
-
-  const expectedBuffer = Buffer.from(expectedSignature, 'hex');
-  const actualBuffer = Buffer.from(providedSignature, 'hex');
-
-  if (expectedBuffer.length !== actualBuffer.length || !crypto.timingSafeEqual(expectedBuffer, actualBuffer)) {
-    logger.warn({ provided: providedSignature, expected: expectedSignature }, 'Meta signature mismatch');
-    return next(buildError('INVALID_SIGNATURE', 'Signature verification failed', 401));
-  }
-
-  next();
 }
 
 /**
  * Verify custom X-Snap-Signature header (for internal/testing webhooks)
+ * Accepts global WEBHOOK_SECRET or per-business webhookAppSecret when business_id is present.
  */
-export function verifyWebhookSignature(req: Request, res: Response, next: NextFunction) {
-  const signatureHeader = req.headers['x-snap-signature'];
-  if (!signatureHeader || typeof signatureHeader !== 'string') {
-    return next(buildError('INVALID_SIGNATURE', 'Missing or invalid signature header', 401));
+export async function verifyWebhookSignature(req: Request, res: Response, next: NextFunction) {
+  try {
+    const signatureHeader = req.headers['x-snap-signature'];
+    if (!signatureHeader || typeof signatureHeader !== 'string') {
+      return next(buildError('INVALID_SIGNATURE', 'Missing or invalid signature header', 401));
+    }
+
+    const rawBody = (req as any).rawBody as Buffer | undefined;
+    if (!rawBody) {
+      return next(buildError('INVALID_SIGNATURE', 'No payload to verify', 401));
+    }
+
+    const candidates = await resolveWebhookSecrets(req);
+    const matched = candidates.some(secret => timingSafeEqualString(hmacHex(secret, rawBody), signatureHeader));
+
+    if (!matched) {
+      return next(buildError('INVALID_SIGNATURE', 'Signature verification failed', 401));
+    }
+
+    next();
+  } catch (err) {
+    next(err);
   }
-
-  const rawBody = (req as any).rawBody as Buffer | undefined;
-  if (!rawBody) {
-    return next(buildError('INVALID_SIGNATURE', 'No payload to verify', 401));
-  }
-
-  const expectedSignature = crypto.createHmac('sha256', config.WEBHOOK_SECRET).update(rawBody).digest('hex');
-  const expectedBuffer = Buffer.from(expectedSignature, 'ascii');
-  const actualBuffer = Buffer.from(signatureHeader, 'ascii');
-
-  if (expectedBuffer.length !== actualBuffer.length || !crypto.timingSafeEqual(expectedBuffer, actualBuffer)) {
-    return next(buildError('INVALID_SIGNATURE', 'Signature verification failed', 401));
-  }
-
-  next();
 }
 
-/**
- * Flexible webhook auth: accepts either Meta signature or custom signature
- * Use this for webhook endpoints that receive both Meta and internal payloads
- */
 export function verifyAnyWebhookSignature(req: Request, res: Response, next: NextFunction) {
   const hasMetaSignature = req.headers['x-hub-signature-256'];
   const hasCustomSignature = req.headers['x-snap-signature'];
@@ -87,12 +121,6 @@ export function verifyAnyWebhookSignature(req: Request, res: Response, next: Nex
   }
 }
 
-/**
- * Verify TikTok webhook signatures.
- * Accepts:
- * - X-TikTok-Signature: <hex_or_base64>
- * - optional X-TikTok-Timestamp
- */
 export function verifyTiktokSignature(req: Request, res: Response, next: NextFunction) {
   const signatureHeader =
     (req.headers['x-tiktok-signature'] as string | undefined) ||

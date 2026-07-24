@@ -30,8 +30,26 @@ vi.mock('../src/services/webhook.service.js', () => ({
 
 vi.mock('../src/config/firebase.js', () => ({
   db: {
-    doc: () => ({ get: async () => ({ exists: true, data: () => ({ ownerEmail: 'test@example.com' }) }) }),
-    collection: () => ({ doc: () => ({ get: async () => ({ exists: true }), set: async () => ({}), update: async () => ({}) }) }),
+    doc: () => ({
+      get: async () => ({
+        exists: true,
+        data: () => ({
+          ownerEmail: 'test@example.com',
+          billing: { plan: 'free', status: 'active' },
+          usage: { periodStart: '2099-01-01', messages: 0, aiCalls: 0, broadcasts: 0 },
+        }),
+        ref: {
+          set: async () => ({}),
+          update: async () => ({}),
+        },
+      }),
+      set: async () => ({}),
+      update: async () => ({}),
+    }),
+    collection: () => ({
+      doc: () => ({ get: async () => ({ exists: true }), set: async () => ({}), update: async () => ({}) }),
+      get: async () => ({ size: 0, docs: [] }),
+    }),
   },
   auth: {
     verifyIdToken: async () => ({ uid: 'test-uid', email: 'test@example.com' }),

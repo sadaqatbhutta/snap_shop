@@ -40,7 +40,10 @@ function IntegrationsPanel({ businessId, business, onClose }: { businessId: stri
   const [credsMsg, setCredsMsg] = useState<string | null>(null);
   const [metaAccessToken, setMetaAccessToken] = useState('');
   const [whatsappPhoneNumberId, setWhatsappPhoneNumberId] = useState('');
+  const [facebookPageId, setFacebookPageId] = useState('');
+  const [instagramPageId, setInstagramPageId] = useState('');
   const [tiktokAccessToken, setTiktokAccessToken] = useState('');
+  const [tiktokBusinessId, setTiktokBusinessId] = useState('');
   const [status, setStatus] = useState<any>(null);
 
   const baseUrl = getApiBaseUrl();
@@ -119,9 +122,11 @@ function IntegrationsPanel({ businessId, business, onClose }: { businessId: stri
 
   const embedSnippet = `<script src="${baseUrl}/webchat-widget.js" data-business-id="${businessId}" data-api-base="${baseUrl}" data-title="Chat with us" data-position="right" defer></script>`;
   const integrationHealth = [
-    { key: 'metaAccessToken', label: 'Meta Access Token', ok: Boolean(status?.metaAccessToken?.configured || business?.metaAccessToken) },
-    { key: 'whatsappPhoneNumberId', label: 'WhatsApp Number ID', ok: Boolean(status?.whatsappPhoneNumberId?.configured || business?.whatsappPhoneNumberId) },
-    { key: 'tiktokAccessToken', label: 'TikTok Access Token', ok: Boolean(status?.tiktokAccessToken?.configured || business?.tiktokAccessToken) },
+    { key: 'metaAccessToken', label: 'Meta Access Token', ok: Boolean(status?.metaAccessToken?.configured) },
+    { key: 'whatsappPhoneNumberId', label: 'WhatsApp Number ID', ok: Boolean(status?.whatsappPhoneNumberId?.configured) },
+    { key: 'facebookPageId', label: 'Facebook Page ID', ok: Boolean(status?.facebookPageId?.configured || status?.metaPageId?.configured) },
+    { key: 'instagramPageId', label: 'Instagram Page ID', ok: Boolean(status?.instagramPageId?.configured || status?.metaPageId?.configured) },
+    { key: 'tiktokAccessToken', label: 'TikTok Access Token', ok: Boolean(status?.tiktokAccessToken?.configured) },
     { key: 'webchat', label: 'Webchat Widget Script', ok: Boolean(baseUrl) },
   ];
 
@@ -140,7 +145,10 @@ function IntegrationsPanel({ businessId, business, onClose }: { businessId: stri
       const body: Record<string, string> = {};
       if (metaAccessToken.trim()) body.metaAccessToken = metaAccessToken.trim();
       if (whatsappPhoneNumberId.trim()) body.whatsappPhoneNumberId = whatsappPhoneNumberId.trim();
+      if (facebookPageId.trim()) body.facebookPageId = facebookPageId.trim();
+      if (instagramPageId.trim()) body.instagramPageId = instagramPageId.trim();
       if (tiktokAccessToken.trim()) body.tiktokAccessToken = tiktokAccessToken.trim();
+      if (tiktokBusinessId.trim()) body.tiktokBusinessId = tiktokBusinessId.trim();
       if (Object.keys(body).length === 0) {
         setCredsMsg('Enter at least one credential to save.');
         setSavingCreds(false);
@@ -159,8 +167,11 @@ function IntegrationsPanel({ businessId, business, onClose }: { businessId: stri
       setStatus(data);
       setMetaAccessToken('');
       setWhatsappPhoneNumberId('');
+      setFacebookPageId('');
+      setInstagramPageId('');
       setTiktokAccessToken('');
-      setCredsMsg('Credentials saved securely.');
+      setTiktokBusinessId('');
+      setCredsMsg('Credentials saved securely. Channel routing bindings updated.');
     } catch (err: any) {
       setCredsMsg(err.message || 'Failed to save');
     } finally {
@@ -285,9 +296,28 @@ function IntegrationsPanel({ businessId, business, onClose }: { businessId: stri
             <div>
               <p className="text-sm font-bold text-gray-800">Channel credentials</p>
               <p className="text-xs text-gray-500 mt-1">
-                Paste tokens for this business. Leave blank to keep existing values. Secrets are stored on the server and returned masked.
+                Connect with Meta (OAuth) or paste tokens manually. Secrets stay on the server.
               </p>
             </div>
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const token = await auth.currentUser?.getIdToken();
+                  const resp = await fetch(getApiUrl(`/api/oauth/meta/start?businessId=${encodeURIComponent(businessId)}`), {
+                    headers: { Authorization: `Bearer ${token}` },
+                  });
+                  const data = await resp.json();
+                  if (!resp.ok) throw new Error(data.message || 'Meta OAuth unavailable');
+                  if (data.url) window.location.href = data.url;
+                } catch (err: any) {
+                  setCredsMsg(err.message || 'Meta OAuth not configured on server');
+                }
+              }}
+              className="w-full py-2.5 bg-[#1877F2] text-white rounded-lg text-sm font-bold hover:bg-[#166fe5]"
+            >
+              Connect with Meta
+            </button>
             <div className="space-y-2">
               <label className="block text-xs font-semibold text-gray-600" htmlFor="meta-token">Meta access token</label>
               <input id="meta-token" type="password" autoComplete="off" value={metaAccessToken} onChange={e => setMetaAccessToken(e.target.value)}
@@ -297,15 +327,57 @@ function IntegrationsPanel({ businessId, business, onClose }: { businessId: stri
               <label className="block text-xs font-semibold text-gray-600" htmlFor="wa-phone-id">WhatsApp phone number ID</label>
               <input id="wa-phone-id" type="text" value={whatsappPhoneNumberId} onChange={e => setWhatsappPhoneNumberId(e.target.value)}
                 placeholder={status?.whatsappPhoneNumberId?.hint || '1234567890'} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500" />
+              <p className="text-[11px] text-gray-500">Must match Meta webhook <code>phone_number_id</code> so inbound WA messages route to this business.</p>
+            </div>
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-gray-600" htmlFor="fb-page-id">Facebook Page ID</label>
+              <input id="fb-page-id" type="text" value={facebookPageId} onChange={e => setFacebookPageId(e.target.value)}
+                placeholder={status?.facebookPageId?.hint || 'Optional'} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-gray-600" htmlFor="ig-page-id">Instagram Page / Account ID</label>
+              <input id="ig-page-id" type="text" value={instagramPageId} onChange={e => setInstagramPageId(e.target.value)}
+                placeholder={status?.instagramPageId?.hint || 'Optional'} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500" />
             </div>
             <div className="space-y-2">
               <label className="block text-xs font-semibold text-gray-600" htmlFor="tiktok-token">TikTok access token</label>
               <input id="tiktok-token" type="password" autoComplete="off" value={tiktokAccessToken} onChange={e => setTiktokAccessToken(e.target.value)}
                 placeholder={status?.tiktokAccessToken?.hint || 'Optional'} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500" />
             </div>
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-gray-600" htmlFor="tiktok-biz-id">TikTok business / open id</label>
+              <input id="tiktok-biz-id" type="text" value={tiktokBusinessId} onChange={e => setTiktokBusinessId(e.target.value)}
+                placeholder={status?.tiktokBusinessId?.hint || 'Optional'} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
             {credsMsg && <p className="text-xs font-medium text-gray-700">{credsMsg}</p>}
             <button type="submit" disabled={savingCreds} className="w-full py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 disabled:opacity-60">
               {savingCreds ? 'Saving…' : 'Save credentials'}
+            </button>
+            <button
+              type="button"
+              disabled={savingCreds}
+              onClick={async () => {
+                setSavingCreds(true);
+                try {
+                  const token = await auth.currentUser?.getIdToken();
+                  const resp = await fetch(getApiUrl(`/api/business/${businessId}/integrations`), {
+                    method: 'PUT',
+                    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ rotateWebhookAppSecret: true }),
+                  });
+                  const data = await resp.json().catch(() => ({}));
+                  if (!resp.ok) throw new Error(data.message || 'Failed to rotate secret');
+                  setStatus(data);
+                  setCredsMsg(`Webhook app secret rotated ${data.webhookAppSecret?.hint || ''}`.trim());
+                } catch (err: any) {
+                  setCredsMsg(err.message || 'Rotate failed');
+                } finally {
+                  setSavingCreds(false);
+                }
+              }}
+              className="w-full py-2 border border-gray-200 bg-white text-gray-700 rounded-lg text-sm font-bold hover:bg-gray-50"
+            >
+              Rotate tenant webhook secret
             </button>
           </form>
 

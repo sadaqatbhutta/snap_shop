@@ -267,6 +267,53 @@ export async function handleStripeWebhook(rawBody: Buffer, signature: string | u
       }
       break;
     }
+    case 'invoice.payment_failed': {
+      const invoice = event.data.object;
+      const customerId = invoice.customer as string | undefined;
+      let businessId = invoice.subscription_details?.metadata?.businessId
+        || invoice.metadata?.businessId
+        || null;
+      if (!businessId && customerId) {
+        const q = await db.collection('businesses').where('billing.stripeCustomerId', '==', customerId).limit(1).get();
+        if (!q.empty) businessId = q.docs[0].id;
+      }
+      if (businessId) {
+        await db.doc(`businesses/${businessId}`).set(
+          {
+            billing: {
+              status: 'past_due',
+              lastPaymentFailedAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
+          },
+          { merge: true }
+        );
+        logger.warn({ businessId, customerId }, 'Marked business past_due after invoice.payment_failed');
+      }
+      break;
+    }
+    case 'invoice.paid': {
+      const invoice = event.data.object;
+      const customerId = invoice.customer as string | undefined;
+      let businessId = invoice.metadata?.businessId || null;
+      if (!businessId && customerId) {
+        const q = await db.collection('businesses').where('billing.stripeCustomerId', '==', customerId).limit(1).get();
+        if (!q.empty) businessId = q.docs[0].id;
+      }
+      if (businessId) {
+        await db.doc(`businesses/${businessId}`).set(
+          {
+            billing: {
+              status: 'active',
+              lastPaymentFailedAt: null,
+              updatedAt: new Date().toISOString(),
+            },
+          },
+          { merge: true }
+        );
+      }
+      break;
+    }
     default:
       logger.info({ type: event.type }, 'Unhandled Stripe webhook event');
   }
