@@ -51,6 +51,7 @@ export default function Conversations() {
   const [nowForUrgent, setNowForUrgent] = useState(Date.now());
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadRetryKey, setLoadRetryKey] = useState(0);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -63,7 +64,7 @@ export default function Conversations() {
     return () => clearInterval(timer);
   }, []);
 
-  // Live conversations list
+  // Conversations list — getDocs only first (matches Analytics path). Live updates below.
   useEffect(() => {
     if (!businessId) {
       setLoading(false);
@@ -72,12 +73,6 @@ export default function Conversations() {
     setLoading(true);
     setLoadError(null);
     let cancelled = false;
-    const timeout = window.setTimeout(() => {
-      if (!cancelled) {
-        setLoadError('Loading conversations is taking too long. Please retry.');
-        setLoading(false);
-      }
-    }, PAGE_LOAD_TIMEOUT_MS);
 
     const conversationsQuery = query(
       collection(db, `businesses/${businessId}/conversations`),
@@ -85,33 +80,52 @@ export default function Conversations() {
       limit(50),
     );
 
-    const unsub = onSnapshot(
-      conversationsQuery,
-      snap => {
+    const timeout = window.setTimeout(() => {
+      if (!cancelled) {
+        setLoadError('Loading conversations is taking too long. Please retry.');
+        setLoading(false);
+      }
+    }, PAGE_LOAD_TIMEOUT_MS);
+
+    void getDocs(conversationsQuery)
+      .then(snap => {
         if (cancelled) return;
         window.clearTimeout(timeout);
         setConversations(snap.docs.map(d => ({ id: d.id, ...d.data() } as Conversation)));
         setLoading(false);
-      },
-      err => {
+      })
+      .catch(err => {
         if (cancelled) return;
-        console.error('Conversations listener failed:', err);
         window.clearTimeout(timeout);
+        console.error('Conversations initial load failed:', err);
         setLoadError(
           err instanceof Error
             ? err.message
             : 'Could not load conversations. Please refresh and try again.',
         );
         setLoading(false);
-      },
-    );
+      });
 
     return () => {
       cancelled = true;
       window.clearTimeout(timeout);
-      unsub();
     };
-  }, [businessId]);
+  }, [businessId, loadRetryKey]);
+
+  // Live list updates (after first paint)
+  useEffect(() => {
+    if (!businessId || loading || loadError) return;
+    const conversationsQuery = query(
+      collection(db, `businesses/${businessId}/conversations`),
+      orderBy('updatedAt', 'desc'),
+      limit(50),
+    );
+    return onSnapshot(
+      conversationsQuery,
+      snap => setConversations(snap.docs.map(d => ({ id: d.id, ...d.data() } as Conversation))),
+      err => console.error('Conversations listener failed:', err),
+    );
+  }, [businessId, loading, loadError]);
 
   // Live messages for selected conversation
   useEffect(() => {
@@ -284,6 +298,24 @@ export default function Conversations() {
     }
   };
 
+  const handleAiFeedback = async (rating: 'up' | 'down') => {
+    if (!businessId || !selectedId) return;
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const note = rating === 'down' ? window.prompt('What should the AI improve? (optional)') || undefined : undefined;
+      await fetch(getApiUrl('/api/ai/feedback'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ businessId, conversationId: selectedId, rating, note }),
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const updateStatus = async (status: 'active' | 'closed' | 'human_escalated') => {
     if (!businessId || !selectedId) return;
     await updateDoc(doc(db, `businesses/${businessId}/conversations`, selectedId), {
@@ -315,8 +347,19 @@ export default function Conversations() {
 
   if (loadError) {
     return (
-      <div className="glass-panel glow-border rounded-xl border border-red-100 bg-red-50/50 p-8 text-center">
+      <div className="glass-panel glow-border rounded-xl border border-red-100 bg-red-50/50 p-8 text-center space-y-4">
         <p className="text-sm font-medium text-red-700">{loadError}</p>
+        <button
+          type="button"
+          onClick={() => {
+            setLoadError(null);
+            setLoading(true);
+            setLoadRetryKey(k => k + 1);
+          }}
+          className="px-4 py-2 bg-teal-800 text-white rounded-lg text-sm font-semibold hover:bg-teal-900"
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -673,6 +716,11 @@ export default function Conversations() {
               {selected.threadSummaryNextAction && (
                 <p className="text-gray-800"><span className="font-semibold">Next:</span> {selected.threadSummaryNextAction}</p>
               )}
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-[10px] font-semibold text-gray-500 uppercase">Rate AI</span>
+                <button type="button" onClick={() => void handleAiFeedback('up')} className="px-2 py-0.5 text-[10px] font-bold rounded bg-teal-50 text-teal-800 border border-teal-100">Helpful</button>
+                <button type="button" onClick={() => void handleAiFeedback('down')} className="px-2 py-0.5 text-[10px] font-bold rounded bg-rose-50 text-rose-700 border border-rose-100">Needs work</button>
+              </div>
               <div className="border-t border-gray-200 pt-2 mt-2">
                 <p className="font-semibold text-gray-800 mb-1">Internal notes (team only)</p>
                 <ul className="space-y-1 mb-2 max-h-24 overflow-y-auto">

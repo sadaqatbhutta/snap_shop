@@ -181,6 +181,35 @@ export default function AISettings() {
         </div>
       </motion.div>
 
+      <motion.div className="glass-panel glow-border p-6 rounded-xl border border-gray-200/80 shadow-sm space-y-4" variants={staggerItem}>
+        <h4 className="font-semibold text-gray-900">Prompt A/B variant</h4>
+        <p className="text-sm text-gray-500">Variant B uses shorter WhatsApp-style replies. Test which converts better.</p>
+        <div className="flex gap-2">
+          {(['A', 'B'] as const).map(v => (
+            <button
+              key={v}
+              type="button"
+              onClick={async () => {
+                if (!businessId) return;
+                await updateDoc(doc(db, 'businesses', businessId), { aiPromptVariant: v });
+                await refreshBusiness();
+              }}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold border ${
+                (business as any)?.aiPromptVariant === v || (!(business as any)?.aiPromptVariant && v === 'A')
+                  ? 'bg-teal-700 text-white border-teal-700'
+                  : 'bg-white text-slate-600 border-gray-200'
+              }`}
+            >
+              Variant {v}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-slate-500">
+          Also configure <a className="text-teal-700 font-semibold underline" href="/app/knowledge">Knowledge Base</a> and{' '}
+          <a className="text-teal-700 font-semibold underline" href="/app/workflows">Workflows</a> for RAG + routing.
+        </p>
+      </motion.div>
+
       <AnimatePresence>
         {saved && (
           <motion.div

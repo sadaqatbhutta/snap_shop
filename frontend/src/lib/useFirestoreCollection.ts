@@ -6,6 +6,7 @@ import {
   limit,
   where,
   onSnapshot,
+  getDocs,
   type QueryConstraint,
 } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -23,8 +24,7 @@ export type FirestoreCollectionOptions = {
 };
 
 /**
- * Live business subcollection via onSnapshot only (first event = initial data).
- * Avoids getDocs + onSnapshot double-read on every mount.
+ * Loads a business subcollection with getDocs first, then onSnapshot for live updates.
  */
 export function useFirestoreCollection<T extends { id: string }>(
   businessId: string | null,
@@ -58,7 +58,8 @@ export function useFirestoreCollection<T extends { id: string }>(
       setLoading(true);
     }
     setError(null);
-    let gotFirst = false;
+    let cancelled = false;
+    const unsubs: Array<() => void> = [];
 
     const constraints: QueryConstraint[] = [];
     if (whereField && whereValue !== undefined) {
@@ -75,7 +76,7 @@ export function useFirestoreCollection<T extends { id: string }>(
     const q = constraints.length ? query(colRef, ...constraints) : query(colRef);
 
     const timeout = window.setTimeout(() => {
-      if (!gotFirst && !silent) {
+      if (!cancelled && !silent) {
         setError(
           timeoutLabel ?? 'Loading is taking too long. Please retry in a moment.',
         );
@@ -83,29 +84,40 @@ export function useFirestoreCollection<T extends { id: string }>(
       }
     }, PAGE_LOAD_TIMEOUT_MS);
 
-    const unsub = onSnapshot(
-      q,
-      snap => {
-        gotFirst = true;
+    void (async () => {
+      try {
+        const snap = await getDocs(q);
+        if (cancelled) return;
         window.clearTimeout(timeout);
         setItems(snap.docs.map(d => ({ id: d.id, ...d.data() } as T)));
         if (!silent) setLoading(false);
-      },
-      err => {
+      } catch (err) {
+        if (cancelled) return;
         window.clearTimeout(timeout);
-        console.error(`Firestore listener failed (${subcollection}):`, err);
+        console.error(`Firestore load failed (${subcollection}):`, err);
         setError(
           err instanceof Error
             ? err.message
             : 'Could not load data. Check Firebase rules and try again.',
         );
         if (!silent) setLoading(false);
-      },
-    );
+        return;
+      }
+
+      if (cancelled) return;
+      unsubs.push(
+        onSnapshot(
+          q,
+          snap => setItems(snap.docs.map(d => ({ id: d.id, ...d.data() } as T))),
+          err => console.error(`Firestore listener failed (${subcollection}):`, err),
+        ),
+      );
+    })();
 
     return () => {
+      cancelled = true;
       window.clearTimeout(timeout);
-      unsub();
+      unsubs.forEach(u => u());
     };
   }, [
     businessId,

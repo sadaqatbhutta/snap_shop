@@ -9,7 +9,7 @@ import { cn } from '../lib/utils';
 import { Link } from 'react-router-dom';
 import { useBusiness } from '../context/BusinessContext';
 import { db, auth } from '../firebase';
-import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, limit } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, limit, getDocs } from 'firebase/firestore';
 import { Broadcast, Template, Segment } from '../../../shared/types';
 import { staggerContainer, staggerItem, fadeUp, scaleIn } from '../lib/animations';
 import { TableSkeleton } from '../components/Skeleton';
@@ -53,46 +53,51 @@ export default function Broadcasts() {
     );
     const templatesCol = query(collection(db, `businesses/${businessId}/templates`), limit(100));
     const segmentsCol = query(collection(db, `businesses/${businessId}/segments`), limit(100));
+    const unsubs: Array<() => void> = [];
 
-    let pending = 3;
-    const markReady = () => {
-      if (pending <= 0) return;
-      pending -= 1;
-      if (pending <= 0 && !cancelled) {
+    void (async () => {
+      try {
+        const [bSnap, tSnap, sSnap] = await Promise.all([
+          getDocs(broadcastsQuery),
+          getDocs(templatesCol),
+          getDocs(segmentsCol),
+        ]);
+        if (cancelled) return;
         window.clearTimeout(timeout);
+        setBroadcasts(bSnap.docs.map(d => ({ id: d.id, ...d.data() } as Broadcast)));
+        setTemplates(tSnap.docs.map(d => ({ id: d.id, ...d.data() } as Template)));
+        setSegments(sSnap.docs.map(d => ({ id: d.id, ...d.data() } as Segment)));
         setLoading(false);
+      } catch (err) {
+        if (cancelled) return;
+        console.error('Broadcasts initial load failed:', err);
+        window.clearTimeout(timeout);
+        setLoadError(
+          err instanceof Error
+            ? err.message
+            : 'Could not load broadcasts. Please refresh and try again.',
+        );
+        setLoading(false);
+        return;
       }
-    };
 
-    const unsubs = [
-      onSnapshot(broadcastsQuery, snap => {
-        if (cancelled) return;
-        setBroadcasts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Broadcast)));
-        markReady();
-      }, err => {
-        console.error('Broadcasts listener failed:', err);
-        if (!cancelled) {
-          setLoadError(err instanceof Error ? err.message : 'Could not load broadcasts.');
-          markReady();
-        }
-      }),
-      onSnapshot(templatesCol, snap => {
-        if (cancelled) return;
-        setTemplates(snap.docs.map(d => ({ id: d.id, ...d.data() } as Template)));
-        markReady();
-      }, err => {
-        console.error('Templates listener failed:', err);
-        markReady();
-      }),
-      onSnapshot(segmentsCol, snap => {
-        if (cancelled) return;
-        setSegments(snap.docs.map(d => ({ id: d.id, ...d.data() } as Segment)));
-        markReady();
-      }, err => {
-        console.error('Segments listener failed:', err);
-        markReady();
-      }),
-    ];
+      if (cancelled) return;
+      unsubs.push(
+        onSnapshot(broadcastsQuery, snap => {
+          setBroadcasts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Broadcast)));
+        }, err => console.error('Broadcasts listener failed:', err)),
+      );
+      unsubs.push(
+        onSnapshot(templatesCol, snap => {
+          setTemplates(snap.docs.map(d => ({ id: d.id, ...d.data() } as Template)));
+        }, err => console.error('Templates listener failed:', err)),
+      );
+      unsubs.push(
+        onSnapshot(segmentsCol, snap => {
+          setSegments(snap.docs.map(d => ({ id: d.id, ...d.data() } as Segment)));
+        }, err => console.error('Segments listener failed:', err)),
+      );
+    })();
 
     return () => {
       cancelled = true;
@@ -244,10 +249,10 @@ export default function Broadcasts() {
           <p className="text-gray-500 text-sm">Send bulk messages to your customer segments.</p>
         </div>
         <div className="flex gap-3">
-          <Link to="/segments" className="hover-lift flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all">
+          <Link to="/app/segments" className="hover-lift flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all">
             <Users className="w-4 h-4 text-teal-600" /> Segments
           </Link>
-          <Link to="/templates" className="hover-lift flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all">
+          <Link to="/app/templates" className="hover-lift flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all">
             <FileText className="w-4 h-4 text-teal-600" /> Templates
           </Link>
           <button onClick={() => setIsModalOpen(true)} className="hover-lift flex items-center gap-2 px-6 py-2 text-sm font-bold text-white bg-teal-700 rounded-lg hover:bg-teal-800 shadow-lg shadow-teal-200 transition-all">
@@ -446,7 +451,7 @@ export default function Broadcasts() {
                   <option value="">Select a template...</option>
                   {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
-                {templates.length === 0 && <p className="text-xs text-orange-500 mt-1">No templates yet. <Link to="/templates" className="underline">Create one first.</Link></p>}
+                {templates.length === 0 && <p className="text-xs text-orange-500 mt-1">No templates yet. <Link to="/app/templates" className="underline">Create one first.</Link></p>}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Segment</label>
@@ -455,7 +460,7 @@ export default function Broadcasts() {
                   <option value="">Select a segment...</option>
                   {segments.map(s => <option key={s.id} value={s.id}>{s.name} ({s.count})</option>)}
                 </select>
-                {segments.length === 0 && <p className="text-xs text-orange-500 mt-1">No segments yet. <Link to="/segments" className="underline">Create one first.</Link></p>}
+                {segments.length === 0 && <p className="text-xs text-orange-500 mt-1">No segments yet. <Link to="/app/segments" className="underline">Create one first.</Link></p>}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Schedule (optional)</label>

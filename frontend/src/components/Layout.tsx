@@ -3,7 +3,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   LayoutDashboard, MessageSquare, Users, Settings, LogOut,
-  Bot, TrendingUp, Megaphone, User, ChevronDown, KeyRound, AlertTriangle, RefreshCw, Shield
+  Bot, TrendingUp, Megaphone, User, ChevronDown, KeyRound, AlertTriangle, RefreshCw, Shield,
+  BookOpen, GitBranch, FileStack, Filter
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { logout } from '../services/authService';
@@ -24,14 +25,18 @@ export default function Layout({ children }: LayoutProps) {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const navItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-    { icon: MessageSquare, label: 'Conversations', path: '/conversations' },
-    { icon: Megaphone, label: 'Broadcasts', path: '/broadcasts' },
-    { icon: Users, label: 'CRM', path: '/crm' },
-    { icon: Bot, label: 'AI Settings', path: '/ai-settings' },
-    { icon: TrendingUp, label: 'Analytics', path: '/analytics' },
-    { icon: Settings, label: 'Settings', path: '/settings' },
-    { icon: Shield, label: 'Admin', path: '/admin' },
+    { icon: LayoutDashboard, label: 'Dashboard', path: '/app' },
+    { icon: MessageSquare, label: 'Conversations', path: '/app/conversations' },
+    { icon: Megaphone, label: 'Broadcasts', path: '/app/broadcasts' },
+    { icon: FileStack, label: 'Templates', path: '/app/templates' },
+    { icon: Filter, label: 'Segments', path: '/app/segments' },
+    { icon: Users, label: 'CRM', path: '/app/crm' },
+    { icon: Bot, label: 'AI Settings', path: '/app/ai-settings' },
+    { icon: BookOpen, label: 'Knowledge', path: '/app/knowledge' },
+    { icon: GitBranch, label: 'Workflows', path: '/app/workflows' },
+    { icon: TrendingUp, label: 'Analytics', path: '/app/analytics' },
+    { icon: Settings, label: 'Settings', path: '/app/settings' },
+    { icon: Shield, label: 'Admin', path: '/app/admin' },
   ];
 
   useEffect(() => {
@@ -79,7 +84,7 @@ export default function Layout({ children }: LayoutProps) {
         transition={{ duration: 0.35, ease: 'easeOut' }}
       >
         <div className="px-5 pt-6 pb-4">
-          <Link to="/" className="block group">
+          <Link to="/app" className="block group">
             <p className="font-display brand-mark text-[1.85rem] leading-none text-[var(--ink)] group-hover:text-[var(--accent-deep)] transition-colors">
               SnapShop
             </p>
@@ -96,7 +101,9 @@ export default function Layout({ children }: LayoutProps) {
 
         <nav className="flex-1 px-3 space-y-1 overflow-y-auto pb-4">
           {navItems.map(item => {
-            const isActive = location.pathname === item.path;
+            const isActive = item.path === '/app'
+              ? location.pathname === '/app'
+              : location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
             return (
               <Link
                 key={item.path}
@@ -185,11 +192,11 @@ export default function Layout({ children }: LayoutProps) {
                     <p className="text-xs text-slate-500 truncate">{user?.email}</p>
                   </div>
                   <div className="p-2">
-                    <Link to="/settings" onClick={() => setProfileOpen(false)} className="flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 rounded-xl hover:bg-slate-50">
+                    <Link to="/app/settings" onClick={() => setProfileOpen(false)} className="flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 rounded-xl hover:bg-slate-50">
                       <User className="w-4 h-4 text-slate-500" />
                       Profile & Settings
                     </Link>
-                    <Link to="/settings" onClick={() => setProfileOpen(false)} className="flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 rounded-xl hover:bg-slate-50">
+                    <Link to="/app/settings" onClick={() => setProfileOpen(false)} className="flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 rounded-xl hover:bg-slate-50">
                       <KeyRound className="w-4 h-4 text-slate-500" />
                       Change Password
                     </Link>

@@ -222,7 +222,7 @@ export default function Dashboard() {
               animate="animate"
             >
               <h3 className="font-semibold text-[var(--ink)]">Recent conversations</h3>
-              <Link to="/conversations" className="text-sm text-teal-800 font-semibold hover:underline">View all</Link>
+              <Link to="/app/conversations" className="text-sm text-teal-800 font-semibold hover:underline">View all</Link>
             </motion.div>
             <motion.div
               className="divide-y divide-[var(--line)]"
@@ -236,7 +236,7 @@ export default function Dashboard() {
               {conversations.map(conv => (
                 <motion.div key={conv.id} variants={staggerItem}>
                   <Link
-                    to="/conversations"
+                    to="/app/conversations"
                     className="p-4 hover:bg-teal-50/40 transition-colors flex items-center justify-between cursor-pointer block"
                   >
                     <div className="flex items-center gap-4">
@@ -275,7 +275,7 @@ export default function Dashboard() {
               animate="animate"
             >
               <h3 className="font-semibold text-[var(--ink)]">Recent broadcasts</h3>
-              <Link to="/broadcasts" className="text-sm text-teal-800 font-semibold hover:underline">View all</Link>
+              <Link to="/app/broadcasts" className="text-sm text-teal-800 font-semibold hover:underline">View all</Link>
             </motion.div>
             <motion.div
               className="p-5 space-y-3"
@@ -319,13 +319,13 @@ export default function Dashboard() {
           <div className="surface-card p-5">
             <h3 className="font-semibold text-[var(--ink)] mb-3">Quick actions</h3>
             <div className="space-y-2.5">
-              <Link to="/broadcasts" className="btn-primary block w-full py-2.5 text-center text-sm">
+              <Link to="/app/broadcasts" className="btn-primary block w-full py-2.5 text-center text-sm">
                 Broadcast message
               </Link>
-              <Link to="/ai-settings" className="block w-full py-2.5 border border-teal-800/30 text-teal-900 text-center rounded-[0.85rem] text-sm font-semibold hover:bg-teal-50">
+              <Link to="/app/ai-settings" className="block w-full py-2.5 border border-teal-800/30 text-teal-900 text-center rounded-[0.85rem] text-sm font-semibold hover:bg-teal-50">
                 Teach the AI
               </Link>
-              <Link to="/crm" className="block w-full py-2.5 border border-[var(--line)] text-slate-600 text-center rounded-[0.85rem] text-sm font-semibold hover:bg-white/70">
+              <Link to="/app/crm" className="block w-full py-2.5 border border-[var(--line)] text-slate-600 text-center rounded-[0.85rem] text-sm font-semibold hover:bg-white/70">
                 Open CRM
               </Link>
             </div>

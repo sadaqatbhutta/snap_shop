@@ -15,19 +15,18 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@': path.resolve(__dirname, 'src'),
       },
+      dedupe: ['firebase'],
     },
     envDir: path.resolve(__dirname, '..'),
     optimizeDeps: {
       include: [
-        'firebase/app',
-        'firebase/auth',
-        'firebase/firestore',
         'motion/react',
         'react',
         'react-dom',
         'react-router-dom',
         'lucide-react',
       ],
+      // Keep firebase out of forced prebundle so app + pages share one instance.
     },
     build: {
       rollupOptions: {

@@ -12,6 +12,15 @@ export interface BusinessSecrets {
   tiktokBusinessId?: string | null;
   /** Per-tenant HMAC secret for X-Snap-Signature (optional). */
   webhookAppSecret?: string | null;
+  /** AI tool / commerce integrations */
+  orderLookupUrl?: string | null;
+  stockLookupUrl?: string | null;
+  bookingUrl?: string | null;
+  shopifyStoreDomain?: string | null;
+  shopifyAccessToken?: string | null;
+  wooBaseUrl?: string | null;
+  wooConsumerKey?: string | null;
+  wooConsumerSecret?: string | null;
 }
 
 const SECRETS_PATH = (businessId: string) => `businesses/${businessId}/private/credentials`;
@@ -36,6 +45,14 @@ export async function loadBusinessSecrets(businessId: string): Promise<BusinessS
     tiktokSendPath: priv.tiktokSendPath ?? legacy.tiktokSendPath ?? null,
     tiktokBusinessId: priv.tiktokBusinessId ?? legacy.tiktokBusinessId ?? null,
     webhookAppSecret: priv.webhookAppSecret ?? null,
+    orderLookupUrl: priv.orderLookupUrl ?? null,
+    stockLookupUrl: priv.stockLookupUrl ?? null,
+    bookingUrl: priv.bookingUrl ?? null,
+    shopifyStoreDomain: priv.shopifyStoreDomain ?? null,
+    shopifyAccessToken: priv.shopifyAccessToken ?? null,
+    wooBaseUrl: priv.wooBaseUrl ?? null,
+    wooConsumerKey: priv.wooConsumerKey ?? null,
+    wooConsumerSecret: priv.wooConsumerSecret ?? null,
   };
 }
 

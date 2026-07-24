@@ -50,6 +50,9 @@ export const PLAN_DEFINITIONS: Record<PlanId, PlanDefinition> = {
     features: [
       'Multi-channel inbox',
       'AI replies + escalation',
+      'RAG knowledge base',
+      'AI tools + workflows',
+      'Multimodal (image/voice)',
       'Segments, templates, broadcasts',
       'Team access',
       'Analytics',
@@ -69,6 +72,8 @@ export const PLAN_DEFINITIONS: Record<PlanId, PlanDefinition> = {
     features: [
       'Everything in Growth Pro',
       'Higher message limits',
+      'CRM AI copilot',
+      'Shopify / Woo commerce tools',
       'Priority support',
     ],
   },

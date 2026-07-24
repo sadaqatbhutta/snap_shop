@@ -13,6 +13,24 @@ vi.mock('../src/services/ai.service.js', () => ({
     summary: 'Customer asked about hours and pricing.',
     nextAction: 'Confirm stock availability if they reply.',
   })),
+  suggestReplyForConversation: vi.fn(async () => ({ suggestedReply: 'Happy to help!' })),
+  generateBroadcastCopy: vi.fn(async () => ({ campaignName: 'Sale', rationale: 'Promo', messageDraft: 'Hi' })),
+  generateCustomerCopilot: vi.fn(async () => ({
+    nextBestAction: 'Follow up',
+    rationale: 'Warm lead',
+    suggestedMessage: 'Hi again',
+    priority: 'high',
+  })),
+  runAIPipeline: vi.fn(async () => ({
+    intent: 'inquiry',
+    language: 'en',
+    confidence: 0.9,
+    reply: 'Hello',
+    shouldEscalate: false,
+    toolsUsed: [],
+    workflow: { matchedRules: [], shouldEscalate: false, skipAi: false, tags: [] },
+    knowledgeUsed: 0,
+  })),
 }));
 
 vi.mock('../src/services/webhook.service.js', () => ({

@@ -10,7 +10,7 @@ import { cn } from '../lib/utils';
 import { useBusiness } from '../context/BusinessContext';
 import { db } from '../firebase';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
-import { Conversation, Message } from '../../../shared/types';
+import { Conversation } from '../../../shared/types';
 import { staggerContainer, staggerItem, fadeUp } from '../lib/animations';
 import { AnalyticsSkeleton } from '../components/Skeleton';
 import { PAGE_LOAD_TIMEOUT_MS } from '../lib/constants';
@@ -44,67 +44,112 @@ export default function Analytics() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [rangeDays, setRangeDays] = useState(12);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
+    const emptyStats = (): Stats => ({
+      convsByDay: Array(rangeDays).fill(0),
+      intentCounts: {},
+      channelCounts: {},
+      totalMessages: 0,
+      escalationRate: 0,
+    });
+
     if (!businessId) {
       setLoading(false);
-      setStats({
-        convsByDay: Array(rangeDays).fill(0),
-        intentCounts: {},
-        channelCounts: {},
-        totalMessages: 0,
-        escalationRate: 0,
-      });
+      setStats(emptyStats());
       return;
     }
+
+    let cancelled = false;
 
     async function load() {
       setLoading(true);
       setLoadError(null);
-      try {
+
       const withTimeout = async <T,>(promise: Promise<T>, label: string): Promise<T> => {
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          window.setTimeout(() => reject(new Error(`${label} timed out after ${PAGE_LOAD_TIMEOUT_MS}ms`)), PAGE_LOAD_TIMEOUT_MS);
-        });
-        return Promise.race([promise, timeoutPromise]);
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          return await Promise.race([
+            promise,
+            new Promise<never>((_, reject) => {
+              timer = window.setTimeout(
+                () => reject(new Error(`${label} timed out after ${PAGE_LOAD_TIMEOUT_MS}ms`)),
+                PAGE_LOAD_TIMEOUT_MS,
+              );
+            }),
+          ]);
+        } finally {
+          if (timer) window.clearTimeout(timer);
+        }
       };
 
-      // 1. Fetch pre-aggregated daily stats (Last 30 days)
-      const statsSnap = await withTimeout(getDocs(
-        query(collection(db, `businesses/${businessId}/stats`), orderBy('__name__', 'desc'), limit(Math.max(rangeDays, 30)))
-      ), 'Analytics stats fetch');
-      
-      // 2. Fetch recent conversations (Last 200 - for channel/escalation breakdown)
-      const convSnap = await withTimeout(getDocs(
-        query(collection(db, `businesses/${businessId}/conversations`), orderBy('updatedAt', 'desc'), limit(200))
-      ), 'Analytics conversations fetch');
+      let statsDocs: Array<{ date: string; [key: string]: unknown }> = [];
+      let convs: Conversation[] = [];
+      const failures: string[] = [];
 
-      const statsDocs = statsSnap.docs.map(d => ({ date: d.id.replace('daily_', ''), ...d.data() }));
-      const convs = convSnap.docs.map(d => d.data() as Conversation);
+      // Load independently so one slow/failing query doesn't blank the whole page.
+      try {
+        const statsSnap = await withTimeout(
+          getDocs(
+            query(
+              collection(db, `businesses/${businessId}/stats`),
+              orderBy('__name__', 'desc'),
+              limit(Math.max(rangeDays, 30)),
+            ),
+          ),
+          'Analytics stats fetch',
+        );
+        statsDocs = statsSnap.docs.map(d => ({ date: d.id.replace('daily_', ''), ...d.data() }));
+      } catch (err) {
+        console.warn('Analytics stats load failed:', err);
+        failures.push('stats');
+      }
 
-      // Aggregates from stats
+      try {
+        const convSnap = await withTimeout(
+          getDocs(
+            query(
+              collection(db, `businesses/${businessId}/conversations`),
+              orderBy('updatedAt', 'desc'),
+              limit(200),
+            ),
+          ),
+          'Analytics conversations fetch',
+        );
+        convs = convSnap.docs.map(d => d.data() as Conversation);
+      } catch (err) {
+        console.warn('Analytics conversations load failed:', err);
+        failures.push('conversations');
+      }
+
+      if (cancelled) return;
+
       const convsByDay = Array(rangeDays).fill(0);
       const now = new Date();
       let aggregatedTotalMessages = 0;
       const aggregatedIntents: Record<string, number> = {};
 
       statsDocs.forEach(s => {
-        const date = new Date(s.date);
+        const date = new Date(String(s.date));
+        if (Number.isNaN(date.getTime())) return;
         const diffDays = Math.floor((now.getTime() - date.getTime()) / 86400000);
-        if (diffDays < rangeDays) {
-          convsByDay[rangeDays - 1 - diffDays] = (s as any).totalConversations || 0;
+        if (diffDays >= 0 && diffDays < rangeDays) {
+          convsByDay[rangeDays - 1 - diffDays] = Number(s.totalConversations) || 0;
         }
-        aggregatedTotalMessages += (s as any).totalMessages || 0;
-        
-        const intents = (s as any).intentCounts || {};
+        aggregatedTotalMessages += Number(s.totalMessages) || 0;
+
+        const intents = (s.intentCounts as Record<string, number>) || {};
         Object.entries(intents).forEach(([intent, count]) => {
-          aggregatedIntents[intent] = (aggregatedIntents[intent] || 0) + (count as number);
+          aggregatedIntents[intent] = (aggregatedIntents[intent] || 0) + Number(count);
         });
       });
 
-      // Breakdowns from existing convs (Fallback until new stats accumulate)
       const channelCounts: Record<string, number> = {};
-      convs.forEach(c => { channelCounts[c.channel] = (channelCounts[c.channel] || 0) + 1; });
+      convs.forEach(c => {
+        if (!c.channel) return;
+        channelCounts[c.channel] = (channelCounts[c.channel] || 0) + 1;
+      });
 
       const escalated = convs.filter(c => c.status === 'human_escalated').length;
       const escalationRate = convs.length ? Math.round((escalated / convs.length) * 100) : 0;
@@ -114,33 +159,41 @@ export default function Analytics() {
         intentCounts: aggregatedIntents,
         channelCounts,
         totalMessages: aggregatedTotalMessages,
-        escalationRate
+        escalationRate,
       });
-      } catch (err) {
-        console.error('Analytics load failed:', err);
-        setLoadError('Could not load analytics data. Please try again.');
-        setStats({
-          convsByDay: Array(rangeDays).fill(0),
-          intentCounts: {},
-          channelCounts: {},
-          totalMessages: 0,
-          escalationRate: 0,
-        });
-      }
+
+      // Only hard-fail when both sources failed; otherwise show whatever we have.
+      setLoadError(
+        failures.length === 2
+          ? 'Could not load analytics data. Please try again.'
+          : failures.length === 1
+            ? `Some analytics data is unavailable (${failures[0]}). Showing partial results.`
+            : null,
+      );
       setLoading(false);
     }
 
     void load();
-  }, [businessId, rangeDays]);
+    return () => {
+      cancelled = true;
+    };
+  }, [businessId, rangeDays, retryKey]);
 
   if (loading) {
     return <AnalyticsSkeleton />;
   }
 
-  if (loadError) {
+  if (loadError && !stats) {
     return (
-      <div className="glass-panel glow-border rounded-xl border border-red-100 bg-red-50/50 p-8 text-center">
+      <div className="glass-panel glow-border rounded-xl border border-red-100 bg-red-50/50 p-8 text-center space-y-4">
         <p className="text-sm font-medium text-red-700">{loadError}</p>
+        <button
+          type="button"
+          onClick={() => setRetryKey(k => k + 1)}
+          className="px-4 py-2 bg-teal-800 text-white rounded-lg text-sm font-semibold hover:bg-teal-900"
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -167,6 +220,18 @@ export default function Analytics() {
 
   return (
     <div className="space-y-8">
+      {loadError && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-center justify-between gap-3">
+          <p className="text-sm text-amber-800">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => setRetryKey(k => k + 1)}
+            className="shrink-0 text-sm font-semibold text-teal-800 hover:underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
       <motion.div
         className="flex items-center justify-between"
         variants={fadeUp}

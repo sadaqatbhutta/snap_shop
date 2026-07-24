@@ -3,17 +3,18 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Search, Filter, Download, Plus, MoreHorizontal, Mail, Phone, Tag,
   ChevronUp, ChevronDown, ArrowUpDown, Edit2, Check, X, MessageSquare,
-  FileText, User, Loader2, Trash2, ChevronDown as ChevronDownIcon, StickyNote
+  FileText, User, Loader2, Trash2, ChevronDown as ChevronDownIcon, StickyNote, Sparkles
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useBusiness } from '../context/BusinessContext';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
-import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, limit } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, getDocs, updateDoc, deleteDoc, doc, limit } from 'firebase/firestore';
 import { Customer } from '../../../shared/types';
 import { staggerContainer, staggerItem, fadeUp, scaleIn } from '../lib/animations';
 import { TableSkeleton } from '../components/Skeleton';
 import { PAGE_LOAD_TIMEOUT_MS } from '../lib/constants';
+import { apiFetch } from '../lib/api';
 
 type SortKey = keyof Customer | null;
 type FilterChannel = 'all' | 'whatsapp' | 'instagram' | 'facebook' | 'tiktok' | 'webchat';
@@ -34,6 +35,14 @@ export default function CRM() {
   const [notesInput, setNotesInput] = useState('');
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadRetryKey, setLoadRetryKey] = useState(0);
+  const [copilotLoading, setCopilotLoading] = useState(false);
+  const [copilot, setCopilot] = useState<{
+    nextBestAction: string;
+    rationale: string;
+    suggestedMessage: string;
+    priority: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!businessId) {
@@ -55,18 +64,18 @@ export default function CRM() {
       orderBy('lastInteractionAt', 'desc'),
       limit(200),
     );
+    const unsubs: Array<() => void> = [];
 
-    const unsub = onSnapshot(
-      customersQuery,
-      snap => {
+    void (async () => {
+      try {
+        const snap = await getDocs(customersQuery);
         if (cancelled) return;
         window.clearTimeout(timeout);
         setCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Customer)));
         setLoading(false);
-      },
-      err => {
+      } catch (err) {
         if (cancelled) return;
-        console.error('CRM listener failed:', err);
+        console.error('CRM initial load failed:', err);
         window.clearTimeout(timeout);
         setLoadError(
           err instanceof Error
@@ -74,15 +83,25 @@ export default function CRM() {
             : 'Could not load CRM data. Please refresh and try again.',
         );
         setLoading(false);
-      },
-    );
+        return;
+      }
+
+      if (cancelled) return;
+      unsubs.push(
+        onSnapshot(
+          customersQuery,
+          snap => setCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Customer))),
+          err => console.error('CRM listener failed:', err),
+        ),
+      );
+    })();
 
     return () => {
       cancelled = true;
       window.clearTimeout(timeout);
-      unsub();
+      unsubs.forEach(u => u());
     };
-  }, [businessId]);
+  }, [businessId, loadRetryKey]);
 
   // Close menus on outside click
   useEffect(() => {
@@ -132,6 +151,23 @@ export default function CRM() {
     setEditingNotes(false);
   };
 
+  const runCopilot = async () => {
+    if (!businessId || !selectedCustomer) return;
+    setCopilotLoading(true);
+    try {
+      const data = await apiFetch('/api/ai/copilot', {
+        method: 'POST',
+        body: JSON.stringify({ businessId, customerId: selectedCustomer.id }),
+      });
+      setCopilot(data);
+    } catch (err) {
+      console.error(err);
+      setCopilot(null);
+    } finally {
+      setCopilotLoading(false);
+    }
+  };
+
   const deleteCustomer = async (id: string) => {
     if (!businessId || !confirm('Delete this customer and all their data?')) return;
     await deleteDoc(doc(db, `businesses/${businessId}/customers`, id));
@@ -159,8 +195,19 @@ export default function CRM() {
   if (loading) return <TableSkeleton rows={8} />;
   if (loadError) {
     return (
-      <div className="glass-panel glow-border rounded-xl border border-red-100 bg-red-50/50 p-8 text-center">
+      <div className="glass-panel glow-border rounded-xl border border-red-100 bg-red-50/50 p-8 text-center space-y-4">
         <p className="text-sm font-medium text-red-700">{loadError}</p>
+        <button
+          type="button"
+          onClick={() => {
+            setLoadError(null);
+            setLoading(true);
+            setLoadRetryKey(k => k + 1);
+          }}
+          className="px-4 py-2 bg-teal-800 text-white rounded-lg text-sm font-semibold hover:bg-teal-900"
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -247,7 +294,7 @@ export default function CRM() {
                 <motion.tr
                   key={customer.id}
                   className="hover:bg-gray-50/80 transition-colors group cursor-pointer hover-lift"
-                  onClick={() => { setSelectedCustomer(customer); setNotesInput(customer.notes || ''); setEditingNotes(false); }}
+                  onClick={() => { setSelectedCustomer(customer); setNotesInput(customer.notes || ''); setEditingNotes(false); setCopilot(null); }}
                   variants={staggerItem}
                   whileHover={{ backgroundColor: 'rgba(99,102,241,0.04)' }}
                   whileTap={{ scale: 0.995 }}
@@ -311,7 +358,7 @@ export default function CRM() {
                       </button>
                       {menuOpenId === customer.id && (
                         <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-20 w-44 overflow-hidden">
-                          <button onClick={() => { navigate('/conversations'); setMenuOpenId(null); }}
+                          <button onClick={() => { navigate('/app/conversations'); setMenuOpenId(null); }}
                             className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
                             <MessageSquare className="w-4 h-4 text-teal-600" /> View Conversations
                           </button>
@@ -374,15 +421,33 @@ export default function CRM() {
               <div className="lg:col-span-2 space-y-6">
                 {/* Quick Actions */}
                 <div className="flex flex-wrap gap-3">
-                  <button onClick={() => navigate('/conversations')}
+                  <button onClick={() => navigate('/app/conversations')}
                     className="flex items-center gap-2 px-4 py-2 bg-teal-700 text-white rounded-lg text-sm font-bold hover:bg-teal-800 transition-all">
                     <MessageSquare className="w-4 h-4" /> View Conversations
+                  </button>
+                  <button onClick={() => void runCopilot()}
+                    className="flex items-center gap-2 px-4 py-2 border border-teal-200 bg-teal-50 text-teal-900 rounded-lg text-sm font-bold hover:bg-teal-100">
+                    {copilotLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                    AI Copilot
                   </button>
                   <button onClick={() => { setEditingTagsId(selectedCustomer.id); setTagInput(selectedCustomer.tags.join(', ')); setSelectedCustomer(null); }}
                     className="flex items-center gap-2 px-4 py-2 border border-gray-200 bg-white text-gray-700 rounded-lg text-sm font-bold hover:bg-gray-50">
                     <Tag className="w-4 h-4" /> Edit Tags
                   </button>
                 </div>
+
+                {copilot && (
+                  <section className="p-4 rounded-xl border border-teal-100 bg-gradient-to-br from-teal-50 to-white space-y-2">
+                    <p className="text-xs font-bold uppercase tracking-wider text-teal-800">Next best action · {copilot.priority}</p>
+                    <p className="text-sm font-semibold text-gray-900">{copilot.nextBestAction}</p>
+                    <p className="text-xs text-slate-600">{copilot.rationale}</p>
+                    {copilot.suggestedMessage && (
+                      <p className="text-sm text-slate-800 bg-white/80 border border-teal-100 rounded-lg p-3 mt-2">
+                        {copilot.suggestedMessage}
+                      </p>
+                    )}
+                  </section>
+                )}
 
                 {/* Notes */}
                 <section className="space-y-3">

@@ -156,6 +156,8 @@ export async function processWebhookJob(channel: string, body: Record<string, un
     senderType: 'customer',
     content,
     type: payload.type,
+    mediaId: (payload as any).mediaId || null,
+    mediaUrl: (payload as any).mediaUrl || null,
     timestamp: now,
   });
 
@@ -173,16 +175,36 @@ export async function processWebhookJob(channel: string, body: Record<string, un
   let aiIntent = 'unknown';
   let aiConfidence: number | undefined;
   let shouldEscalate = false;
+  let leadScoreHint: number | undefined;
+  let buySignal = false;
+  let workflowTags: string[] = [];
+  let leadPriorityBoost: 'hot' | 'urgent' | undefined;
+  let assignedQueue: string | undefined;
 
   // ─── AI Processing (only if not human-escalated) ─────────────────────────
   if (!isHumanHandling) {
     try {
       await assertWithinPlanLimit(businessId, 'aiCalls');
-      const aiResult = await runAIPipeline(content, businessId, history);
+      const aiResult = await runAIPipeline(content, businessId, history, {
+        customerId,
+        channel,
+        media: {
+          type: payload.type,
+          text: content,
+          mediaId: (payload as any).mediaId,
+          mediaUrl: (payload as any).mediaUrl,
+          mimeType: (payload as any).mimeType,
+        },
+      });
       aiReply = aiResult.reply;
       aiIntent = aiResult.intent;
       aiConfidence = aiResult.confidence;
       shouldEscalate = aiResult.shouldEscalate;
+      leadScoreHint = aiResult.leadScoreHint;
+      buySignal = Boolean(aiResult.buySignal);
+      workflowTags = aiResult.workflow.tags || [];
+      leadPriorityBoost = aiResult.workflow.leadPriorityBoost;
+      assignedQueue = aiResult.workflow.assignedQueue;
       await incrementUsage(businessId, 'aiCalls');
 
       const aiMsgId = uuidv4();
@@ -195,6 +217,8 @@ export async function processWebhookJob(channel: string, body: Record<string, un
         content: aiReply,
         type: 'text',
         intent: aiIntent,
+        toolsUsed: aiResult.toolsUsed,
+        knowledgeUsed: aiResult.knowledgeUsed,
         timestamp: new Date().toISOString(),
       });
 
@@ -225,7 +249,12 @@ export async function processWebhookJob(channel: string, body: Record<string, un
 
   const finalStatus: 'active' | 'human_escalated' =
     isHumanHandling || shouldEscalate ? 'human_escalated' : 'active';
-  const signals = deriveConversationSignals(content, finalStatus, aiConfidence, shouldEscalate);
+  const signals = deriveConversationSignals(content, finalStatus, aiConfidence, shouldEscalate, {
+    leadScoreHint,
+    buySignal,
+    workflowTags,
+    leadPriorityBoost,
+  });
   const lastMessageForUi = !isHumanHandling ? aiReply : content;
 
   const convPatch: Record<string, unknown> = {
@@ -239,6 +268,7 @@ export async function processWebhookJob(channel: string, body: Record<string, un
   };
   if (aiConfidence !== undefined) convPatch.aiConfidence = aiConfidence;
   if (finalStatus === 'human_escalated') convPatch.status = 'human_escalated';
+  if (assignedQueue) convPatch.assignedQueue = assignedQueue;
 
   await db.doc(`businesses/${businessId}/conversations/${conversationId}`).update(convPatch);
 

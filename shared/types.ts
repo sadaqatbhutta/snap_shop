@@ -30,6 +30,16 @@ export interface Business {
   confidenceThreshold: number;
   onboarding?: OnboardingProgress;
   aiMacros?: AIMacro[];
+  /** Prompt A/B test variant for AI tone */
+  aiPromptVariant?: 'A' | 'B';
+  /** Non-secret AI integration endpoints (tokens stay in private credentials) */
+  aiIntegrations?: {
+    orderLookupUrl?: string;
+    stockLookupUrl?: string;
+    bookingUrl?: string;
+    shopifyStoreDomain?: string;
+    wooBaseUrl?: string;
+  };
   /** Public routing ids only — access tokens live in private/credentials (Admin SDK). */
   whatsappPhoneNumberId?: string | null;
   facebookPageId?: string | null;
@@ -101,6 +111,7 @@ export interface Conversation {
   leadScore?: number;
   sentimentTags?: string[];
   needsHumanReview?: boolean;
+  assignedQueue?: 'sales' | 'support' | 'billing' | string;
   internalNotes?: InternalNote[];
   threadSummary?: string;
   threadSummaryNextAction?: string;

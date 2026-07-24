@@ -43,7 +43,7 @@ export default function Privacy() {
         </p>
       </section>
 
-      <Link to="/settings" className="inline-block text-sm font-semibold text-teal-700 hover:underline">
+      <Link to="/app/settings" className="inline-block text-sm font-semibold text-teal-700 hover:underline">
         ← Back to Settings
       </Link>
     </motion.div>

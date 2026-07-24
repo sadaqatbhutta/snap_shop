@@ -32,7 +32,8 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys()
         .hasOnly([
           'name', 'description', 'aiContext', 'faqs', 'confidenceThreshold',
-          'onboarding', 'aiMacros', 'notifications', 'ownerEmail', 'updatedAt'
+          'onboarding', 'aiMacros', 'notifications', 'ownerEmail', 'updatedAt',
+          'aiPromptVariant', 'aiIntegrations'
         ]);
     }
 
@@ -103,6 +104,10 @@ service cloud.firestore {
         allow read: if isBusinessOwner(businessId) || isAgent(businessId);
         allow create, update: if (isBusinessOwner(businessId) || isAgent(businessId)) && isValidCustomer(request.resource.data);
         allow delete: if isAdmin(businessId);
+
+        match /private/{docId} {
+          allow read, write: if false;
+        }
       }
 
       match /conversations/{conversationId} {
@@ -150,6 +155,34 @@ service cloud.firestore {
       match /digest_events/{eventId} {
         allow read: if isBusinessOwner(businessId) || isAdmin(businessId);
         allow write: if false;
+      }
+
+      match /knowledge/{docId} {
+        allow read: if isBusinessOwner(businessId) || isAgent(businessId);
+        allow write: if false;
+      }
+
+      match /knowledge_chunks/{chunkId} {
+        allow read, write: if false;
+      }
+
+      match /workflows/{ruleId} {
+        allow read: if isBusinessOwner(businessId) || isAgent(businessId);
+        allow write: if false;
+      }
+
+      match /ai_feedback/{feedbackId} {
+        allow read: if isBusinessOwner(businessId) || isAgent(businessId);
+        allow write: if false;
+      }
+
+      match /ai_improvement_hints/{hintId} {
+        allow read: if isBusinessOwner(businessId) || isAdmin(businessId);
+        allow write: if false;
+      }
+
+      match /webchat_outbox/{msgId} {
+        allow read, write: if false;
       }
     }
 

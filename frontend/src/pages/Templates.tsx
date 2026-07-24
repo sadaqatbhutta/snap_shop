@@ -88,7 +88,7 @@ export default function Templates() {
         animate="animate"
       >
         <div className="flex items-center gap-4">
-          <Link to="/broadcasts" className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+          <Link to="/app/broadcasts" className="p-2 hover:bg-gray-100 rounded-full transition-colors">
             <ChevronLeft className="w-6 h-6 text-gray-500" />
           </Link>
           <div>
