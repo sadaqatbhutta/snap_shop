@@ -4,12 +4,17 @@ import path from 'path';
 import { defineConfig, loadEnv } from 'vite';
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, path.resolve(__dirname, '..'), '');
+  const rootEnv = loadEnv(mode, path.resolve(__dirname, '..'), '');
+  // Prefer backend/.env* PORT so Vite proxy matches the API server (root PORT is often unrelated).
+  const backendEnv = loadEnv(mode, path.resolve(__dirname, '../backend'), '');
+  const proxyPort = backendEnv.PORT || rootEnv.BACKEND_PORT || rootEnv.VITE_API_PROXY_PORT || '3000';
+  const proxyTarget = (rootEnv.VITE_API_PROXY_TARGET || `http://localhost:${proxyPort}`).replace(/\/$/, '');
+
   return {
     root: path.resolve(__dirname),
     plugins: [react(), tailwindcss()],
     define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+      'process.env.GEMINI_API_KEY': JSON.stringify(rootEnv.GEMINI_API_KEY),
     },
     resolve: {
       alias: {
@@ -47,7 +52,7 @@ export default defineConfig(({ mode }) => {
     server: {
       proxy: {
         '/api': {
-          target: `http://localhost:${env.PORT || '3000'}`,
+          target: proxyTarget,
           changeOrigin: true,
           secure: false,
         },

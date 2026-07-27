@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { MessageSquare, Users, TrendingUp, Clock, ArrowUpRight, Megaphone, ListChecks, CheckCircle2, Sparkles } from 'lucide-react';
+import { MessageSquare, Users, TrendingUp, Clock, ArrowUpRight, Megaphone, ListChecks, CheckCircle2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useBusiness } from '../context/BusinessContext';
 import type { OnboardingProgress } from '../../../shared/types';
@@ -89,10 +89,10 @@ export default function Dashboard() {
   const channelsDone = ob.channelReviewed;
 
   const onboardingItems = [
-    { done: aiKnowledgeDone, label: 'Teach the AI (context + FAQs)', href: '/ai-settings', key: 'aiContextFilled' as const },
-    { done: channelsDone, label: 'Configure channel webhooks', href: '/settings', key: 'channelReviewed' as const },
-    { done: teamDone, label: 'Invite a teammate', href: '/settings', key: 'teamInvited' as const },
-    { done: chatsDone, label: 'Receive your first customer message', href: '/conversations', key: 'firstTestChat' as const },
+    { done: aiKnowledgeDone, label: 'Teach the AI (context + FAQs)', href: '/app/ai-settings', key: 'aiContextFilled' as const },
+    { done: channelsDone, label: 'Configure channel webhooks', href: '/app/settings', key: 'channelReviewed' as const },
+    { done: teamDone, label: 'Invite a teammate', href: '/app/settings', key: 'teamInvited' as const },
+    { done: chatsDone, label: 'Receive your first customer message', href: '/app/conversations', key: 'firstTestChat' as const },
   ];
 
   const onboardingComplete = onboardingItems.every(i => i.done);
@@ -121,25 +121,23 @@ export default function Dashboard() {
   return (
     <div className="space-y-8">
       <motion.div
-        className="relative overflow-hidden rounded-[1.35rem] border border-[var(--line)] bg-[var(--ink)] text-white px-6 py-7 sm:px-8"
+        className="relative overflow-hidden rounded-[1.5rem] hero-stage text-white px-6 py-8 sm:px-8 sm:py-9"
         variants={fadeUp}
         initial="initial"
         animate="animate"
       >
-        <div className="pointer-events-none absolute -right-10 -top-16 h-56 w-56 rounded-full bg-teal-400/25 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-20 left-10 h-48 w-48 rounded-full bg-slate-400/20 blur-3xl" />
-        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.22em] font-semibold text-teal-200/80">Workspace</p>
+            <p className="text-[11px] uppercase tracking-[0.22em] font-bold text-[var(--accent-bright)]">Today</p>
             <h1 className="font-display text-4xl sm:text-5xl mt-2 leading-none">
               {business?.name || 'SnapShop'}
             </h1>
-            <p className="mt-3 max-w-xl text-sm text-slate-300 leading-relaxed">
+            <p className="mt-3 max-w-xl text-sm text-white/65 leading-relaxed">
               Your AI inbox is live — replies, escalations, and campaigns in one calm surface.
             </p>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-teal-100">
-            <Sparkles className="w-3.5 h-3.5" />
+          <div className="inline-flex items-center gap-2 rounded-[0.7rem] border border-white/15 bg-white/10 px-3.5 py-2 text-xs font-bold text-white backdrop-blur-sm">
+            <span className="status-dot" />
             AI online · {activeCount} active
           </div>
         </div>
@@ -195,18 +193,18 @@ export default function Dashboard() {
         {stats.map(stat => (
           <motion.div
             key={stat.label}
-            className="surface-card p-5 hover-lift"
+            className="kpi-tile p-5 hover-lift bg-white/90"
             variants={staggerItem}
             whileHover={{ y: -3 }}
             transition={{ duration: 0.2 }}
           >
             <div className="flex items-center justify-between mb-3">
-              <div className="p-2 rounded-lg bg-teal-50 text-teal-800">
+              <div className="p-2 rounded-lg bg-[var(--accent-soft)] text-[var(--accent-deep)]">
                 <stat.icon className="w-5 h-5" />
               </div>
-              <ArrowUpRight className="w-4 h-4 text-teal-700/70" />
+              <ArrowUpRight className="w-4 h-4 text-[var(--ink-soft)]/50" />
             </div>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{stat.label}</h3>
+            <h3 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--ink-soft)]">{stat.label}</h3>
             <p className="font-display text-3xl text-[var(--ink)] mt-1">{stat.value}</p>
           </motion.div>
         ))}
@@ -322,10 +320,13 @@ export default function Dashboard() {
               <Link to="/app/broadcasts" className="btn-primary block w-full py-2.5 text-center text-sm">
                 Broadcast message
               </Link>
-              <Link to="/app/ai-settings" className="block w-full py-2.5 border border-teal-800/30 text-teal-900 text-center rounded-[0.85rem] text-sm font-semibold hover:bg-teal-50">
+              <Link to="/app/knowledge" className="btn-accent block w-full py-2.5 text-center text-sm">
+                Add knowledge
+              </Link>
+              <Link to="/app/ai-settings" className="btn-ghost block w-full py-2.5 text-center text-sm">
                 Teach the AI
               </Link>
-              <Link to="/app/crm" className="block w-full py-2.5 border border-[var(--line)] text-slate-600 text-center rounded-[0.85rem] text-sm font-semibold hover:bg-white/70">
+              <Link to="/app/crm" className="btn-ghost block w-full py-2.5 text-center text-sm">
                 Open CRM
               </Link>
             </div>

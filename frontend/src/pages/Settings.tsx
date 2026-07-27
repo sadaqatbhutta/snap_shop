@@ -860,17 +860,25 @@ export default function Settings() {
 
   const readHealth = useCallback(async () => {
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 3000);
+    const timeout = window.setTimeout(() => controller.abort(), 8000);
     try {
       setHealthLoading(true);
       const resp = await fetch(getApiUrl('/api/runtime'), { signal: controller.signal });
-      if (!resp.ok) throw new Error(`Runtime endpoint failed (${resp.status})`);
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({} as { message?: string }));
+        throw new Error(body.message || `Runtime endpoint failed (${resp.status})`);
+      }
       const data = (await resp.json()) as RuntimePayload;
       setRuntimeHealth(data);
       setHealthError(null);
       healthBootstrappedRef.current = true;
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unable to read health status.';
+      const message =
+        err instanceof Error && err.name === 'AbortError'
+          ? 'Runtime health timed out — is the backend running?'
+          : err instanceof Error
+            ? err.message
+            : 'Unable to read health status.';
       setHealthError(message);
       // Keep current UI responsive when runtime endpoint is slow/unavailable.
       if (!healthBootstrappedRef.current) {

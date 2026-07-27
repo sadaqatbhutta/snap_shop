@@ -205,33 +205,31 @@ export default function AuthGuard({ children }: AuthGuardProps) {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.4, ease: 'easeOut' }}
       >
-        <div className="mesh-orb -top-20 -left-16 h-80 w-80 bg-teal-300/25 pointer-events-none" />
-        <div className="mesh-orb -bottom-24 -right-16 h-80 w-80 bg-slate-400/20 pointer-events-none [animation-delay:1s]" />
+        <div className="mesh-orb -top-20 -left-16 h-80 w-80 bg-[var(--accent)]/30 pointer-events-none" />
+        <div className="mesh-orb -bottom-24 -right-16 h-80 w-80 bg-slate-400/15 pointer-events-none [animation-delay:1s]" />
 
-        <div className="hidden lg:flex lg:w-[48%] p-12 flex-col justify-between relative overflow-hidden bg-[var(--ink)] text-white">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(20,184,166,0.35),transparent_45%),radial-gradient(circle_at_90%_80%,rgba(148,163,184,0.2),transparent_40%)]" />
-          <div className="absolute inset-0 opacity-30" style={{ backgroundImage: "url('/auth-bg.svg')", backgroundSize: 'cover', backgroundPosition: 'center' }} />
+        <div className="hidden lg:flex lg:w-[48%] p-12 flex-col justify-between relative overflow-hidden hero-stage text-white">
           <div className="relative z-10">
             <p className="font-display text-4xl brand-mark">SnapShop</p>
-            <p className="mt-2 text-[11px] uppercase tracking-[0.28em] text-teal-200/80 font-semibold">AI customer workspace</p>
+            <p className="mt-2 text-[11px] uppercase tracking-[0.28em] text-[var(--accent-bright)] font-bold">AI customer workspace</p>
             <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="mt-16 max-w-md">
-              <h2 className="font-display text-5xl leading-[1.05] text-white">
+              <h2 className="font-display text-5xl leading-[1.02] text-white">
                 Conversations that think with you.
               </h2>
-              <p className="mt-5 text-slate-300 text-base leading-relaxed">
+              <p className="mt-5 text-white/65 text-base leading-relaxed">
                 An AI-native inbox for WhatsApp, Instagram, webchat, and campaigns — built for the pace of modern sales.
               </p>
-              <div className="mt-10 space-y-3 text-sm text-slate-200">
-                {['Gemini replies with human escalation', 'Broadcasts + segments', 'Usage-aware billing plans'].map(item => (
+              <div className="mt-10 space-y-3 text-sm text-white/85">
+                {['Gemini replies with human escalation', 'RAG knowledge + workflows', 'Usage-aware billing plans'].map(item => (
                   <div key={item} className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-teal-300 shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-[var(--accent-bright)] shrink-0" />
                     <span>{item}</span>
                   </div>
                 ))}
               </div>
             </motion.div>
           </div>
-          <p className="relative z-10 text-xs text-slate-400">Built for the AI era · SnapShop</p>
+          <p className="relative z-10 text-xs text-white/45">Built for the AI era · SnapShop</p>
         </div>
 
         <div className="w-full lg:w-[52%] flex items-center justify-center p-6 sm:p-10">
@@ -242,7 +240,7 @@ export default function AuthGuard({ children }: AuthGuardProps) {
             className="w-full max-w-md surface-card p-7 sm:p-8 space-y-6"
           >
             <div>
-              <p className="text-[11px] uppercase tracking-[0.2em] font-semibold text-teal-800/70 mb-2">Secure access</p>
+              <p className="page-eyebrow mb-2">Secure access</p>
               <h1 className="font-display text-3xl text-[var(--ink)] mb-2">
                 {isLogin ? 'Welcome back' : 'Start your workspace'}
               </h1>

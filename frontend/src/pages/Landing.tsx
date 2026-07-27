@@ -5,95 +5,139 @@ import { ArrowRight, MessageSquare, Bot, Megaphone, Sparkles } from 'lucide-reac
 
 export default function Landing() {
   return (
-    <div className="min-h-screen text-[var(--ink)] relative overflow-hidden">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="mesh-orb -top-24 -left-16 h-[28rem] w-[28rem] bg-teal-300/25" />
-        <div className="mesh-orb bottom-0 right-0 h-96 w-96 bg-slate-400/15 [animation-delay:1s]" />
-      </div>
-
-      <header className="relative z-10 flex items-center justify-between px-6 md:px-12 py-6">
-        <div>
-          <p className="font-display brand-mark text-3xl leading-none">SnapShop</p>
-          <p className="text-[11px] uppercase tracking-[0.22em] font-semibold text-teal-800/70 mt-1">AI customer workspace</p>
+    <div className="min-h-screen text-[var(--ink)]">
+      {/* Full-bleed hero — one composition */}
+      <section className="relative min-h-[100svh] overflow-hidden hero-stage">
+        <div className="pointer-events-none absolute inset-0 opacity-40">
+          <div className="mesh-orb top-[-10%] left-[-5%] h-[36rem] w-[36rem] bg-[var(--accent)]" />
+          <div className="mesh-orb bottom-[-15%] right-[-8%] h-[28rem] w-[28rem] bg-white/20 [animation-delay:1.2s]" />
         </div>
-        <Link to="/app" className="btn-primary px-5 py-2.5 text-sm inline-flex items-center gap-2">
-          Open workspace <ArrowRight className="w-4 h-4" />
-        </Link>
-      </header>
 
-      <section className="relative z-10 px-6 md:px-12 pt-10 pb-20 md:pt-16 max-w-6xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="max-w-3xl"
-        >
-          <p className="font-display text-5xl md:text-7xl leading-[1.02] text-[var(--ink)]">
-            SnapShop
-          </p>
-          <h1 className="mt-5 font-display text-2xl md:text-4xl text-[var(--ink-soft)] leading-snug">
-            Conversations that sell while you sleep.
-          </h1>
-          <p className="mt-5 text-base md:text-lg text-slate-600 max-w-xl leading-relaxed">
-            Multi-channel AI inbox with RAG knowledge, tools, voice & image understanding, and human escalation — built for WhatsApp-first businesses.
-          </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Link to="/app" className="btn-primary px-6 py-3.5 text-sm inline-flex items-center gap-2">
-              Start free <ArrowRight className="w-4 h-4" />
-            </Link>
-            <a href="#features" className="px-6 py-3.5 text-sm font-semibold rounded-xl border border-[var(--line)] bg-white/70 hover:bg-white">
-              See what&apos;s inside
-            </a>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15, duration: 0.55 }}
-          className="mt-16 md:mt-20 relative rounded-3xl overflow-hidden border border-[var(--line)] bg-[var(--ink)] text-white min-h-[280px] md:min-h-[360px]"
-        >
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(20,184,166,0.4),transparent_45%),radial-gradient(circle_at_85%_70%,rgba(148,163,184,0.25),transparent_40%)]" />
-          <div className="relative z-10 p-8 md:p-12 flex flex-col justify-end h-full min-h-[280px] md:min-h-[360px]">
-            <p className="text-teal-200/90 text-xs uppercase tracking-[0.2em] font-semibold">Live AI agent</p>
-            <p className="font-display text-3xl md:text-4xl mt-3 max-w-lg leading-tight">
-              Replies with your catalog. Escalates when it shouldn&apos;t guess.
+        <header className="relative z-20 flex items-center justify-between px-6 md:px-12 pt-7">
+          <div>
+            <p className="font-display brand-mark text-[2rem] md:text-[2.35rem] leading-none text-white">SnapShop</p>
+            <p className="mt-1.5 text-[10px] uppercase tracking-[0.28em] font-semibold text-[var(--accent-bright)]/90">
+              AI customer workspace
             </p>
           </div>
-        </motion.div>
+          <Link
+            to="/app"
+            className="inline-flex items-center gap-2 rounded-[0.7rem] bg-white px-4 py-2.5 text-sm font-bold text-[var(--ink)] hover:bg-[var(--accent-bright)] transition-colors"
+          >
+            Open workspace <ArrowRight className="w-4 h-4" />
+          </Link>
+        </header>
+
+        <div className="relative z-20 flex flex-col justify-end min-h-[calc(100svh-5.5rem)] px-6 md:px-12 pb-14 md:pb-20 max-w-6xl">
+          <motion.p
+            className="font-display text-[clamp(3.4rem,11vw,7.5rem)] leading-[0.92] text-white max-w-4xl"
+            initial={{ opacity: 0, y: 28 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+          >
+            SnapShop
+          </motion.p>
+
+          <motion.p
+            className="mt-6 text-lg md:text-xl text-white/70 max-w-lg leading-relaxed"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.12, duration: 0.5 }}
+          >
+            Conversations that sell while you sleep — AI inbox, knowledge, and campaigns in one workspace.
+          </motion.p>
+
+          <motion.div
+            className="mt-9 flex flex-wrap gap-3"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.22, duration: 0.45 }}
+          >
+            <Link
+              to="/app"
+              className="inline-flex items-center gap-2 rounded-[0.7rem] bg-[var(--accent)] px-6 py-3.5 text-sm font-bold text-white hover:brightness-110"
+            >
+              Start free <ArrowRight className="w-4 h-4" />
+            </Link>
+            <a
+              href="#product"
+              className="inline-flex items-center gap-2 rounded-[0.7rem] border border-white/25 bg-white/5 px-6 py-3.5 text-sm font-semibold text-white backdrop-blur-sm hover:bg-white/10"
+            >
+              See the product
+            </a>
+          </motion.div>
+
+          {/* Ambient product signal — not a card overlay */}
+          <motion.div
+            className="mt-14 md:mt-16 flex flex-col gap-3 max-w-md"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4, duration: 0.6 }}
+          >
+            <div className="chat-bubble-demo self-start rounded-2xl rounded-bl-md bg-white/10 border border-white/15 px-4 py-3 text-sm text-white/90 backdrop-blur-md">
+              Do you have the navy hoodie in XL?
+            </div>
+            <div className="chat-bubble-demo self-end rounded-2xl rounded-br-md bg-[var(--accent)]/90 px-4 py-3 text-sm text-white shadow-lg">
+              Yes — XL navy is in stock. Want me to reserve one?
+            </div>
+            <div className="chat-bubble-demo self-start rounded-2xl rounded-bl-md bg-white/10 border border-white/15 px-4 py-3 text-sm text-white/90 backdrop-blur-md">
+              Yes please — COD to Gulberg.
+            </div>
+          </motion.div>
+        </div>
       </section>
 
-      <section id="features" className="relative z-10 px-6 md:px-12 pb-24 max-w-6xl mx-auto">
-        <h2 className="font-display text-3xl mb-8">Built for the AI era</h2>
-        <div className="grid md:grid-cols-2 gap-6">
+      <section id="product" className="relative px-6 md:px-12 py-20 md:py-28 max-w-6xl mx-auto">
+        <p className="page-eyebrow mb-3">Built for the AI era</p>
+        <h2 className="section-title text-3xl md:text-5xl max-w-2xl leading-[1.05]">
+          An agent that knows your catalog — and knows when to hand off.
+        </h2>
+
+        <div className="mt-14 grid md:grid-cols-2 gap-x-12 gap-y-12">
           {[
             { icon: Bot, title: 'RAG + memory', body: 'Answers from your knowledge base and remembers each customer across chats.' },
-            { icon: Sparkles, title: 'Tools & workflows', body: 'Order lookup, stock checks, booking hooks, and routing rules to sales or support.' },
-            { icon: MessageSquare, title: 'Multimodal inbox', body: 'Understands voice notes and product photos — not just text.' },
-            { icon: Megaphone, title: 'Campaigns that convert', body: 'Segments, templates, and AI-written broadcasts across channels.' },
+            { icon: Sparkles, title: 'Tools & workflows', body: 'Order lookup, stock checks, booking hooks, and routing to sales or support.' },
+            { icon: MessageSquare, title: 'Multimodal inbox', body: 'Understands voice notes and product photos — not just text threads.' },
+            { icon: Megaphone, title: 'Campaigns that convert', body: 'Segments, templates, and AI-written broadcasts across every channel.' },
           ].map((f, i) => (
             <motion.div
               key={f.title}
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 14 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.06 }}
-              className="py-2"
+              viewport={{ once: true, margin: '-40px' }}
+              transition={{ delay: i * 0.05, duration: 0.4 }}
             >
-              <f.icon className="w-5 h-5 text-teal-700 mb-3" />
-              <h3 className="font-semibold text-lg">{f.title}</h3>
-              <p className="text-sm text-slate-600 mt-2 leading-relaxed max-w-md">{f.body}</p>
+              <f.icon className="w-5 h-5 text-[var(--accent-deep)] mb-4" strokeWidth={2.2} />
+              <h3 className="font-display text-xl md:text-2xl text-[var(--ink)]">{f.title}</h3>
+              <p className="mt-2 text-[var(--ink-soft)] text-[0.95rem] leading-relaxed max-w-sm">{f.body}</p>
             </motion.div>
           ))}
         </div>
       </section>
 
-      <footer className="relative z-10 px-6 md:px-12 py-8 border-t border-[var(--line)] flex flex-wrap gap-4 justify-between text-sm text-slate-500">
-        <p>© {new Date().getFullYear()} SnapShop</p>
-        <div className="flex gap-4">
-          <Link to="/privacy" className="hover:text-teal-800">Privacy</Link>
-          <Link to="/terms" className="hover:text-teal-800">Terms</Link>
-          <Link to="/app" className="hover:text-teal-800">Sign in</Link>
+      <section className="relative px-6 md:px-12 pb-24 max-w-6xl mx-auto">
+        <div className="rounded-[1.75rem] overflow-hidden hero-stage min-h-[240px] md:min-h-[300px] flex items-end p-8 md:p-12">
+          <div className="relative z-10 max-w-xl">
+            <p className="text-[var(--accent-bright)] text-xs font-bold uppercase tracking-[0.2em]">Ready when you are</p>
+            <p className="font-display text-3xl md:text-4xl text-white mt-3 leading-tight">
+              Launch your AI workspace in minutes.
+            </p>
+            <Link
+              to="/app"
+              className="mt-7 inline-flex items-center gap-2 rounded-[0.7rem] bg-white px-5 py-3 text-sm font-bold text-[var(--ink)] hover:bg-[var(--accent-bright)]"
+            >
+              Get started <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <footer className="px-6 md:px-12 py-8 border-t border-[var(--line)] flex flex-wrap gap-4 justify-between text-sm text-[var(--ink-soft)] max-w-6xl mx-auto">
+        <p className="font-display text-[var(--ink)]">SnapShop</p>
+        <div className="flex gap-5">
+          <Link to="/privacy" className="hover:text-[var(--accent-deep)]">Privacy</Link>
+          <Link to="/terms" className="hover:text-[var(--accent-deep)]">Terms</Link>
+          <Link to="/app" className="hover:text-[var(--accent-deep)]">Sign in</Link>
         </div>
       </footer>
     </div>
