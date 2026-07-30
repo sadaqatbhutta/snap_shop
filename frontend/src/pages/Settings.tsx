@@ -4,7 +4,7 @@ import {
   Settings as SettingsIcon, Lock, Globe, CreditCard, ChevronRight,
   Mail, AlertTriangle, Clock, Save, Loader2, CheckCircle2,
   X, Copy, Check, Phone, MessageSquare, ExternalLink, Music2,
-  Eye, EyeOff, KeyRound, Users, UserPlus
+  Eye, EyeOff, KeyRound, Users, UserPlus, ShoppingBag
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
@@ -44,6 +44,14 @@ function IntegrationsPanel({ businessId, business, onClose }: { businessId: stri
   const [instagramPageId, setInstagramPageId] = useState('');
   const [tiktokAccessToken, setTiktokAccessToken] = useState('');
   const [tiktokBusinessId, setTiktokBusinessId] = useState('');
+  const [shopifyStoreDomain, setShopifyStoreDomain] = useState('');
+  const [shopifyAccessToken, setShopifyAccessToken] = useState('');
+  const [wooBaseUrl, setWooBaseUrl] = useState('');
+  const [wooConsumerKey, setWooConsumerKey] = useState('');
+  const [wooConsumerSecret, setWooConsumerSecret] = useState('');
+  const [orderLookupUrl, setOrderLookupUrl] = useState('');
+  const [stockLookupUrl, setStockLookupUrl] = useState('');
+  const [bookingUrl, setBookingUrl] = useState('');
   const [status, setStatus] = useState<any>(null);
 
   const baseUrl = getApiBaseUrl();
@@ -55,7 +63,15 @@ function IntegrationsPanel({ businessId, business, onClose }: { businessId: stri
         const resp = await fetch(getApiUrl(`/api/business/${businessId}/integrations`), {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (resp.ok) setStatus(await resp.json());
+        if (resp.ok) {
+          const data = await resp.json();
+          setStatus(data);
+          if (typeof data.shopifyStoreDomain === 'string') setShopifyStoreDomain(data.shopifyStoreDomain);
+          if (typeof data.wooBaseUrl === 'string') setWooBaseUrl(data.wooBaseUrl);
+          if (typeof data.orderLookupUrl === 'string') setOrderLookupUrl(data.orderLookupUrl);
+          if (typeof data.stockLookupUrl === 'string') setStockLookupUrl(data.stockLookupUrl);
+          if (typeof data.bookingUrl === 'string') setBookingUrl(data.bookingUrl);
+        }
       } catch {
         /* ignore */
       }
@@ -378,6 +394,112 @@ function IntegrationsPanel({ businessId, business, onClose }: { businessId: stri
               className="w-full py-2 border border-gray-200 bg-white text-gray-700 rounded-lg text-sm font-bold hover:bg-gray-50"
             >
               Rotate tenant webhook secret
+            </button>
+          </form>
+
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setSavingCreds(true);
+              setCredsMsg(null);
+              try {
+                const token = await auth.currentUser?.getIdToken();
+                const body: Record<string, string> = {};
+                if (shopifyStoreDomain.trim()) body.shopifyStoreDomain = shopifyStoreDomain.trim();
+                if (shopifyAccessToken.trim()) body.shopifyAccessToken = shopifyAccessToken.trim();
+                if (wooBaseUrl.trim()) body.wooBaseUrl = wooBaseUrl.trim();
+                if (wooConsumerKey.trim()) body.wooConsumerKey = wooConsumerKey.trim();
+                if (wooConsumerSecret.trim()) body.wooConsumerSecret = wooConsumerSecret.trim();
+                if (orderLookupUrl.trim()) body.orderLookupUrl = orderLookupUrl.trim();
+                if (stockLookupUrl.trim()) body.stockLookupUrl = stockLookupUrl.trim();
+                if (bookingUrl.trim()) body.bookingUrl = bookingUrl.trim();
+                if (Object.keys(body).length === 0) {
+                  setCredsMsg('Enter at least one commerce field to save.');
+                  setSavingCreds(false);
+                  return;
+                }
+                const resp = await fetch(getApiUrl(`/api/business/${businessId}/integrations`), {
+                  method: 'PUT',
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify(body),
+                });
+                const data = await resp.json().catch(() => ({}));
+                if (!resp.ok) throw new Error(data.message || 'Failed to save commerce settings');
+                setStatus(data);
+                setShopifyAccessToken('');
+                setWooConsumerKey('');
+                setWooConsumerSecret('');
+                setCredsMsg('Commerce integrations saved. AI tools can use Shopify/Woo lookups.');
+              } catch (err: any) {
+                setCredsMsg(err.message || 'Failed to save commerce settings');
+              } finally {
+                setSavingCreds(false);
+              }
+            }}
+            className="p-4 rounded-xl border border-amber-100 bg-amber-50/40 space-y-3"
+          >
+            <div className="flex items-center gap-2">
+              <ShoppingBag className="w-5 h-5 text-amber-800" />
+              <div>
+                <p className="text-sm font-bold text-gray-800">Commerce (Shopify / WooCommerce)</p>
+                <p className="text-xs text-gray-500">Powers AI order and stock tools. Secrets stay on the server.</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-gray-600" htmlFor="shopify-domain">Shopify store domain</label>
+                <input id="shopify-domain" type="text" value={shopifyStoreDomain} onChange={e => setShopifyStoreDomain(e.target.value)}
+                  placeholder="your-store.myshopify.com" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-teal-600" />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-gray-600" htmlFor="shopify-token">Shopify Admin API token</label>
+                <input id="shopify-token" type="password" autoComplete="off" value={shopifyAccessToken} onChange={e => setShopifyAccessToken(e.target.value)}
+                  placeholder={status?.shopifyAccessToken?.hint || 'shpat_…'} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-teal-600" />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-gray-600" htmlFor="woo-base">WooCommerce base URL</label>
+                <input id="woo-base" type="url" value={wooBaseUrl} onChange={e => setWooBaseUrl(e.target.value)}
+                  placeholder="https://example.com" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-teal-600" />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-gray-600" htmlFor="woo-key">Woo consumer key</label>
+                <input id="woo-key" type="password" autoComplete="off" value={wooConsumerKey} onChange={e => setWooConsumerKey(e.target.value)}
+                  placeholder={status?.wooConsumerKey?.hint || 'ck_…'} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-teal-600" />
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <label className="block text-xs font-semibold text-gray-600" htmlFor="woo-secret">Woo consumer secret</label>
+                <input id="woo-secret" type="password" autoComplete="off" value={wooConsumerSecret} onChange={e => setWooConsumerSecret(e.target.value)}
+                  placeholder={status?.wooConsumerSecret?.hint || 'cs_…'} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-teal-600" />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-gray-600" htmlFor="order-url">Custom order lookup URL</label>
+                <input id="order-url" type="url" value={orderLookupUrl} onChange={e => setOrderLookupUrl(e.target.value)}
+                  placeholder="Optional webhook URL" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-teal-600" />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-gray-600" htmlFor="stock-url">Custom stock lookup URL</label>
+                <input id="stock-url" type="url" value={stockLookupUrl} onChange={e => setStockLookupUrl(e.target.value)}
+                  placeholder="Optional webhook URL" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-teal-600" />
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <label className="block text-xs font-semibold text-gray-600" htmlFor="booking-url">Booking URL</label>
+                <input id="booking-url" type="url" value={bookingUrl} onChange={e => setBookingUrl(e.target.value)}
+                  placeholder="Optional" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-teal-600" />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 text-[11px]">
+              <span className={cn('px-2 py-0.5 rounded-full font-bold', status?.shopifyAccessToken?.configured ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700')}>
+                Shopify {status?.shopifyAccessToken?.configured ? 'configured' : 'missing'}
+              </span>
+              <span className={cn('px-2 py-0.5 rounded-full font-bold', status?.wooConsumerKey?.configured ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700')}>
+                Woo {status?.wooConsumerKey?.configured ? 'configured' : 'missing'}
+              </span>
+            </div>
+            <button type="submit" disabled={savingCreds} className="w-full py-2.5 bg-[var(--ink)] text-white rounded-lg text-sm font-bold hover:bg-teal-800 disabled:opacity-60">
+              {savingCreds ? 'Saving…' : 'Save commerce settings'}
             </button>
           </form>
 

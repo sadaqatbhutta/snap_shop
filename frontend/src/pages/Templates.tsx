@@ -19,6 +19,45 @@ import { useFirestoreCollection } from '../lib/useFirestoreCollection';
 import LoadErrorBanner from '../components/LoadErrorBanner';
 import { staggerContainer, staggerItem, fadeUp, scaleIn } from '../lib/animations';
 
+type TemplateForm = {
+  name: string;
+  content: string;
+  type: 'text' | 'image';
+  channelScope: 'internal' | 'whatsapp_meta';
+  metaTemplateName: string;
+  metaLanguageCode: string;
+  metaBodyParams: string;
+};
+
+const emptyForm = (): TemplateForm => ({
+  name: '',
+  content: '',
+  type: 'text',
+  channelScope: 'internal',
+  metaTemplateName: '',
+  metaLanguageCode: 'en',
+  metaBodyParams: '',
+});
+
+function formFromTemplate(t: Template): TemplateForm {
+  return {
+    name: t.name,
+    content: t.content || '',
+    type: t.type,
+    channelScope: t.channelScope === 'whatsapp_meta' ? 'whatsapp_meta' : 'internal',
+    metaTemplateName: t.metaTemplateName || '',
+    metaLanguageCode: t.metaLanguageCode || 'en',
+    metaBodyParams: (t.metaBodyParams || []).join(', '),
+  };
+}
+
+function parseBodyParams(raw: string): string[] {
+  return raw
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
 export default function Templates() {
   const { businessId } = useBusiness();
   const {
@@ -33,36 +72,49 @@ export default function Templates() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: '', content: '', type: 'text' as 'text' | 'image' });
+  const [form, setForm] = useState<TemplateForm>(emptyForm());
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!businessId) return;
+    if (form.channelScope === 'whatsapp_meta' && !form.metaTemplateName.trim()) {
+      alert('Meta template name is required for WhatsApp Meta templates.');
+      return;
+    }
+    if (form.channelScope === 'internal' && !form.content.trim()) {
+      alert('Message content is required for internal templates.');
+      return;
+    }
+
     setSaving(true);
     const now = new Date().toISOString();
+    const bodyParams = parseBodyParams(form.metaBodyParams);
+    const payload = {
+      name: form.name,
+      content: form.content,
+      type: form.type,
+      channelScope: form.channelScope,
+      metaTemplateName: form.channelScope === 'whatsapp_meta' ? form.metaTemplateName.trim() : null,
+      metaLanguageCode: form.channelScope === 'whatsapp_meta' ? (form.metaLanguageCode.trim() || 'en') : null,
+      metaBodyParams: form.channelScope === 'whatsapp_meta' && bodyParams.length ? bodyParams : null,
+      updatedAt: now,
+    };
+
     if (editingTemplateId) {
-      await updateDoc(doc(db, `businesses/${businessId}/templates`, editingTemplateId), {
-        name: form.name,
-        content: form.content,
-        type: form.type,
-        updatedAt: now,
-      });
+      await updateDoc(doc(db, `businesses/${businessId}/templates`, editingTemplateId), payload);
     } else {
       await addDoc(collection(db, `businesses/${businessId}/templates`), {
         businessId,
-        name: form.name,
-        content: form.content,
-        type: form.type,
+        ...payload,
         usageCount: 0,
         createdAt: now,
-        updatedAt: now,
       });
     }
     setSaving(false);
     setIsModalOpen(false);
     setEditingTemplateId(null);
-    setForm({ name: '', content: '', type: 'text' });
+    setForm(emptyForm());
   };
 
   const handleDelete = async (id: string) => {
@@ -72,7 +124,8 @@ export default function Templates() {
 
   const filtered = templates.filter(t =>
     t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    t.content.toLowerCase().includes(searchQuery.toLowerCase())
+    (t.content || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (t.metaTemplateName || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (loadError) {
@@ -93,11 +146,11 @@ export default function Templates() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Message Templates</h1>
-            <p className="text-gray-500">Manage pre-defined messages for your broadcasts.</p>
+            <p className="text-gray-500">Internal snippets or Meta-approved WhatsApp templates for broadcasts.</p>
           </div>
         </div>
         <button
-          onClick={() => { setEditingTemplateId(null); setForm({ name: '', content: '', type: 'text' }); setIsModalOpen(true); }}
+          onClick={() => { setEditingTemplateId(null); setForm(emptyForm()); setIsModalOpen(true); }}
           className="hover-lift flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-teal-700 rounded-lg hover:bg-teal-800"
         >
           <Plus className="w-4 h-4" /> Create Template
@@ -135,11 +188,16 @@ export default function Templates() {
                   <div className={cn('p-2 rounded-lg', template.type === 'text' ? 'bg-blue-50 text-blue-600' : 'bg-teal-50 text-teal-700')}>
                     {template.type === 'text' ? <Type className="w-4 h-4" /> : <ImageIcon className="w-4 h-4" />}
                   </div>
-                  <h3 className="font-semibold text-gray-900 text-sm">{template.name}</h3>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 text-sm">{template.name}</h3>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                      {template.channelScope === 'whatsapp_meta' ? 'WhatsApp Meta' : 'Internal'}
+                    </p>
+                  </div>
                 </div>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
-                    onClick={() => { setEditingTemplateId(template.id); setForm({ name: template.name, content: template.content, type: template.type }); setIsModalOpen(true); }}
+                    onClick={() => { setEditingTemplateId(template.id); setForm(formFromTemplate(template)); setIsModalOpen(true); }}
                     className="p-1.5 hover:bg-gray-100 rounded text-gray-400 hover:text-teal-700 transition-colors"
                   >
                     <Edit2 className="w-4 h-4" />
@@ -153,7 +211,15 @@ export default function Templates() {
                 </div>
               </div>
               <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 mb-4">
-                <p className="text-sm text-gray-700 line-clamp-3 leading-relaxed">{template.content}</p>
+                {template.channelScope === 'whatsapp_meta' ? (
+                  <p className="text-sm text-gray-700 leading-relaxed">
+                    Meta: <code className="text-xs bg-white px-1 rounded border">{template.metaTemplateName}</code>
+                    {' · '}
+                    {template.metaLanguageCode || 'en'}
+                  </p>
+                ) : (
+                  <p className="text-sm text-gray-700 line-clamp-3 leading-relaxed">{template.content}</p>
+                )}
               </div>
               <div className="flex items-center justify-between text-xs text-gray-500">
                 <div className="flex items-center gap-1">
@@ -165,13 +231,17 @@ export default function Templates() {
             </div>
             <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
               <button
-                onClick={() => { setForm({ name: template.name + ' (copy)', content: template.content, type: template.type }); setIsModalOpen(true); }}
+                onClick={() => { setForm({ ...formFromTemplate(template), name: template.name + ' (copy)' }); setEditingTemplateId(null); setIsModalOpen(true); }}
                 className="text-xs font-semibold text-teal-700 hover:text-teal-800 flex items-center gap-1"
               >
                 <Copy className="w-3 h-3" /> Duplicate
               </button>
               <button className="text-xs font-semibold text-gray-600 hover:text-gray-900 flex items-center gap-1"
-                onClick={() => alert(`Preview:\n\n${template.content}`)}
+                onClick={() => alert(
+                  template.channelScope === 'whatsapp_meta'
+                    ? `Meta template:\n${template.metaTemplateName} (${template.metaLanguageCode || 'en'})`
+                    : `Preview:\n\n${template.content}`
+                )}
               >
                 <Layout className="w-3 h-3" /> Preview
               </button>
@@ -180,7 +250,7 @@ export default function Templates() {
         ))}
 
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => { setEditingTemplateId(null); setForm(emptyForm()); setIsModalOpen(true); }}
           className="glass-panel glow-border hover-lift bg-gray-50/80 rounded-xl border-2 border-dashed border-gray-300 p-8 flex flex-col items-center justify-center gap-3 hover:bg-gray-100 hover:border-teal-300 transition-all group"
         >
           <div className="p-3 bg-white rounded-full shadow-sm group-hover:scale-110 transition-transform">
@@ -197,7 +267,6 @@ export default function Templates() {
         <div className="text-center py-8 text-gray-400 text-sm">No templates yet. Create your first one above.</div>
       )}
 
-      {/* Create Template Modal */}
       <AnimatePresence>
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -220,6 +289,25 @@ export default function Templates() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-600 outline-none text-sm" />
               </div>
               <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Channel scope</label>
+                <div className="flex gap-3">
+                  {([
+                    { id: 'internal' as const, label: 'Internal' },
+                    { id: 'whatsapp_meta' as const, label: 'WhatsApp Meta' },
+                  ]).map(opt => (
+                    <button key={opt.id} type="button" onClick={() => setForm({ ...form, channelScope: opt.id })}
+                      className={cn('flex-1 py-2 rounded-lg text-sm font-medium border transition-all',
+                        form.channelScope === opt.id ? 'bg-teal-700 text-white border-teal-700' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                      )}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-gray-500 mt-1">
+                  WhatsApp Meta templates are required for WhatsApp broadcast recipients outside the 24h window.
+                </p>
+              </div>
+              <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Type</label>
                 <div className="flex gap-3">
                   {(['text', 'image'] as const).map(t => (
@@ -232,12 +320,41 @@ export default function Templates() {
                   ))}
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Message Content</label>
-                <textarea required rows={4} placeholder="Write your message here... Use [Link] for URLs."
-                  value={form.content} onChange={e => setForm({ ...form, content: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-600 outline-none text-sm resize-none" />
-              </div>
+              {form.channelScope === 'whatsapp_meta' ? (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Meta template name</label>
+                    <input required type="text" placeholder="e.g. order_update" value={form.metaTemplateName}
+                      onChange={e => setForm({ ...form, metaTemplateName: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-600 outline-none text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Language code</label>
+                    <input type="text" placeholder="en" value={form.metaLanguageCode}
+                      onChange={e => setForm({ ...form, metaLanguageCode: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-600 outline-none text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Body params (optional, comma-separated)</label>
+                    <input type="text" placeholder="John, ORD-123" value={form.metaBodyParams}
+                      onChange={e => setForm({ ...form, metaBodyParams: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-600 outline-none text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Fallback / notes (optional)</label>
+                    <textarea rows={2} placeholder="Internal note about this Meta template"
+                      value={form.content} onChange={e => setForm({ ...form, content: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-600 outline-none text-sm resize-none" />
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Message Content</label>
+                  <textarea required rows={4} placeholder="Write your message here... Use [Link] for URLs."
+                    value={form.content} onChange={e => setForm({ ...form, content: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-600 outline-none text-sm resize-none" />
+                </div>
+              )}
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => { setIsModalOpen(false); setEditingTemplateId(null); }} className="flex-1 px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancel</button>
                 <button type="submit" disabled={saving} className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-teal-700 rounded-lg hover:bg-teal-800 disabled:opacity-60 flex items-center justify-center gap-2">

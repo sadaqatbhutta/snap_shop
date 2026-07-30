@@ -11,6 +11,13 @@ export type OutboundMedia = {
   caption?: string;
 };
 
+/** Meta WhatsApp Cloud API approved template (HSM) payload. */
+export type WhatsAppMetaTemplate = {
+  name: string;
+  languageCode: string;
+  bodyParams?: string[];
+};
+
 /** Queue an outbound webchat reply for the embed widget to poll. */
 export async function enqueueWebchatOutbound(
   businessId: string,
@@ -56,7 +63,8 @@ export async function sendMessage(
   recipientId: string,
   message: string,
   businessId: string,
-  media?: OutboundMedia
+  media?: OutboundMedia,
+  waTemplate?: WhatsAppMetaTemplate
 ) {
   const secrets = await loadBusinessSecrets(businessId);
   const accessToken = secrets.metaAccessToken || config.META_ACCESS_TOKEN;
@@ -107,7 +115,30 @@ export async function sendMessage(
         throw new Error('Missing WhatsApp phone number ID');
       }
 
-      if (media?.type === 'image' && media.imageUrl) {
+      if (waTemplate?.name) {
+        const components: Array<Record<string, unknown>> = [];
+        if (waTemplate.bodyParams && waTemplate.bodyParams.length > 0) {
+          components.push({
+            type: 'body',
+            parameters: waTemplate.bodyParams.map(text => ({ type: 'text', text })),
+          });
+        }
+        await axios.post(
+          `${apiUrl}/${phoneNumberId}/messages`,
+          {
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: recipientId,
+            type: 'template',
+            template: {
+              name: waTemplate.name,
+              language: { code: waTemplate.languageCode || 'en' },
+              ...(components.length ? { components } : {}),
+            },
+          },
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+      } else if (media?.type === 'image' && media.imageUrl) {
         await axios.post(
           `${apiUrl}/${phoneNumberId}/messages`,
           {
@@ -167,5 +198,10 @@ export async function sendMessage(
     }
   }, 'sendMessage', { maxAttempts: 3, baseDelayMs: 1000 });
 
-  logger.info({ channel, recipientId, businessId, mediaType: media?.type || 'text' }, 'Delivered outbound message');
+  logger.info({
+    channel,
+    recipientId,
+    businessId,
+    mediaType: waTemplate?.name ? 'template' : media?.type || 'text',
+  }, 'Delivered outbound message');
 }

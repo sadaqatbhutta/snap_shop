@@ -16,6 +16,15 @@ export interface ChannelCredentialsInput {
   tiktokBusinessId?: string;
   /** Set true to rotate a new per-tenant X-Snap-Signature secret. */
   rotateWebhookAppSecret?: boolean;
+  /** Commerce / AI tool integrations */
+  shopifyStoreDomain?: string;
+  shopifyAccessToken?: string;
+  wooBaseUrl?: string;
+  wooConsumerKey?: string;
+  wooConsumerSecret?: string;
+  orderLookupUrl?: string;
+  stockLookupUrl?: string;
+  bookingUrl?: string;
 }
 
 function maskSecret(value: string | undefined | null): { configured: boolean; hint: string | null } {
@@ -34,6 +43,15 @@ export async function getIntegrationsStatus(businessId: string) {
   const snap = await db.doc(`businesses/${businessId}`).get();
   if (!snap.exists) throw buildError('BUSINESS_NOT_FOUND', 'Business does not exist', 404);
   const secrets = await loadBusinessSecrets(businessId);
+  const biz = (snap.data() || {}) as {
+    aiIntegrations?: {
+      shopifyStoreDomain?: string;
+      wooBaseUrl?: string;
+      orderLookupUrl?: string;
+      stockLookupUrl?: string;
+      bookingUrl?: string;
+    };
+  };
 
   return {
     metaAccessToken: maskSecret(secrets.metaAccessToken),
@@ -46,6 +64,14 @@ export async function getIntegrationsStatus(businessId: string) {
     webhookAppSecret: maskSecret(secrets.webhookAppSecret),
     tiktokApiBase: secrets.tiktokApiBase || null,
     tiktokSendPath: secrets.tiktokSendPath || null,
+    shopifyStoreDomain: secrets.shopifyStoreDomain || biz.aiIntegrations?.shopifyStoreDomain || null,
+    shopifyAccessToken: maskSecret(secrets.shopifyAccessToken),
+    wooBaseUrl: secrets.wooBaseUrl || biz.aiIntegrations?.wooBaseUrl || null,
+    wooConsumerKey: maskSecret(secrets.wooConsumerKey),
+    wooConsumerSecret: maskSecret(secrets.wooConsumerSecret),
+    orderLookupUrl: secrets.orderLookupUrl || biz.aiIntegrations?.orderLookupUrl || null,
+    stockLookupUrl: secrets.stockLookupUrl || biz.aiIntegrations?.stockLookupUrl || null,
+    bookingUrl: secrets.bookingUrl || biz.aiIntegrations?.bookingUrl || null,
     webhookVerifyHint: 'Platform WEBHOOK_VERIFY_TOKEN for Meta verify; optional per-tenant webhookAppSecret for X-Snap-Signature.',
   };
 }
@@ -70,6 +96,14 @@ export async function updateIntegrations(
   if (input.tiktokApiBase !== undefined) secretPatch.tiktokApiBase = input.tiktokApiBase;
   if (input.tiktokSendPath !== undefined) secretPatch.tiktokSendPath = input.tiktokSendPath;
   if (input.tiktokBusinessId !== undefined) secretPatch.tiktokBusinessId = input.tiktokBusinessId;
+  if (input.shopifyAccessToken !== undefined) secretPatch.shopifyAccessToken = input.shopifyAccessToken;
+  if (input.shopifyStoreDomain !== undefined) secretPatch.shopifyStoreDomain = input.shopifyStoreDomain;
+  if (input.wooConsumerKey !== undefined) secretPatch.wooConsumerKey = input.wooConsumerKey;
+  if (input.wooConsumerSecret !== undefined) secretPatch.wooConsumerSecret = input.wooConsumerSecret;
+  if (input.wooBaseUrl !== undefined) secretPatch.wooBaseUrl = input.wooBaseUrl;
+  if (input.orderLookupUrl !== undefined) secretPatch.orderLookupUrl = input.orderLookupUrl;
+  if (input.stockLookupUrl !== undefined) secretPatch.stockLookupUrl = input.stockLookupUrl;
+  if (input.bookingUrl !== undefined) secretPatch.bookingUrl = input.bookingUrl;
   if (input.rotateWebhookAppSecret) {
     const crypto = await import('crypto');
     secretPatch.webhookAppSecret = crypto.randomBytes(32).toString('hex');
@@ -96,6 +130,29 @@ export async function updateIntegrations(
     publicPatch.tiktokBusinessId = input.tiktokBusinessId.trim() || null;
   }
 
+  const aiIntegrationsPatch: Record<string, string | null> = {};
+  if (input.shopifyStoreDomain !== undefined) {
+    aiIntegrationsPatch.shopifyStoreDomain = input.shopifyStoreDomain.trim() || null;
+  }
+  if (input.wooBaseUrl !== undefined) {
+    aiIntegrationsPatch.wooBaseUrl = input.wooBaseUrl.trim() || null;
+  }
+  if (input.orderLookupUrl !== undefined) {
+    aiIntegrationsPatch.orderLookupUrl = input.orderLookupUrl.trim() || null;
+  }
+  if (input.stockLookupUrl !== undefined) {
+    aiIntegrationsPatch.stockLookupUrl = input.stockLookupUrl.trim() || null;
+  }
+  if (input.bookingUrl !== undefined) {
+    aiIntegrationsPatch.bookingUrl = input.bookingUrl.trim() || null;
+  }
+  if (Object.keys(aiIntegrationsPatch).length) {
+    publicPatch.aiIntegrations = {
+      ...(snap.data()?.aiIntegrations || {}),
+      ...aiIntegrationsPatch,
+    };
+  }
+
   await saveBusinessSecrets(businessId, secretPatch);
   const next = await loadBusinessSecrets(businessId);
   publicPatch.integrationsConfigured = {
@@ -104,6 +161,8 @@ export async function updateIntegrations(
     facebook: Boolean(next.facebookPageId || next.metaPageId),
     instagram: Boolean(next.instagramPageId || next.metaPageId),
     tiktok: Boolean(next.tiktokAccessToken),
+    shopify: Boolean(next.shopifyAccessToken && (next.shopifyStoreDomain || aiIntegrationsPatch.shopifyStoreDomain)),
+    woo: Boolean(next.wooConsumerKey && next.wooConsumerSecret && (next.wooBaseUrl || aiIntegrationsPatch.wooBaseUrl)),
   };
 
   await snap.ref.set(publicPatch, { merge: true });

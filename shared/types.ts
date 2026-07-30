@@ -52,6 +52,8 @@ export interface Business {
     facebook?: boolean;
     instagram?: boolean;
     tiktok?: boolean;
+    shopify?: boolean;
+    woo?: boolean;
   };
   notifications?: {
     inquiries?: boolean;
@@ -158,6 +160,12 @@ export interface Template {
   name: string;
   content: string;
   type: 'text' | 'image';
+  /** internal = free-form content; whatsapp_meta = Meta-approved HSM for WA broadcasts */
+  channelScope?: 'internal' | 'whatsapp_meta';
+  metaTemplateName?: string;
+  metaLanguageCode?: string;
+  /** Optional body parameter placeholders for Meta template components */
+  metaBodyParams?: string[];
   usageCount: number;
   createdAt: string;
   updatedAt: string;

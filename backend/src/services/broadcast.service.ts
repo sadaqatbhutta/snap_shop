@@ -97,11 +97,25 @@ export async function processBroadcastJob(data: BroadcastJobData) {
     throw buildError('TEMPLATE_NOT_FOUND', 'Template not found', 404);
   }
   const template = templateSnap.data() as any;
-  const messageContent = template.content;
+  const messageContent = template.content as string | undefined;
+  const isWhatsAppMeta =
+    template.channelScope === 'whatsapp_meta' ||
+    Boolean(template.metaTemplateName);
 
-  if (!messageContent) {
+  if (!isWhatsAppMeta && !messageContent) {
     throw buildError('TEMPLATE_EMPTY', 'Template has no content', 422);
   }
+
+  const waTemplateMeta =
+    isWhatsAppMeta && template.metaTemplateName
+      ? {
+          name: String(template.metaTemplateName),
+          languageCode: String(template.metaLanguageCode || 'en'),
+          bodyParams: Array.isArray(template.metaBodyParams)
+            ? template.metaBodyParams.map(String)
+            : undefined,
+        }
+      : null;
 
   // ─── Fetch Segment Criteria ──────────────────────────────────────────────
   const segmentSnap = await db.doc(`businesses/${businessId}/segments/${segmentId}`).get();
@@ -178,7 +192,37 @@ export async function processBroadcastJob(data: BroadcastJobData) {
     // Send messages to filtered customers
     for (const customer of filtered) {
       try {
-        await sendMessage(customer.channel, customer.externalId, messageContent, businessId);
+        const channel = String(customer.channel || '');
+        if (channel === 'whatsapp') {
+          if (!waTemplateMeta) {
+            totalFailed++;
+            logger.error({
+              broadcastId,
+              customerId: customer.id,
+              error: 'WhatsApp broadcasts require a Meta-approved template (metaTemplateName)',
+            }, 'Failed to send broadcast message');
+            continue;
+          }
+          await sendMessage(
+            channel,
+            customer.externalId,
+            messageContent || template.metaTemplateName || template.name || '',
+            businessId,
+            undefined,
+            waTemplateMeta,
+          );
+        } else {
+          if (!messageContent) {
+            totalFailed++;
+            logger.error({
+              broadcastId,
+              customerId: customer.id,
+              error: 'Template has no content for non-WhatsApp channel',
+            }, 'Failed to send broadcast message');
+            continue;
+          }
+          await sendMessage(channel, customer.externalId, messageContent, businessId);
+        }
         totalSent++;
         
         logger.info({

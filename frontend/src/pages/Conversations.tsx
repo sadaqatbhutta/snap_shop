@@ -9,12 +9,13 @@ import { db } from '../firebase';
 import {
   collection, query, orderBy, onSnapshot, updateDoc, doc, limit, limitToLast, arrayUnion, getDocs,
 } from 'firebase/firestore';
-import { Conversation, Message, InternalNote } from '../../../shared/types';
+import { Conversation, Message, InternalNote, Agent } from '../../../shared/types';
 import { auth } from '../firebase';
 import { getApiUrl } from '../lib/apiBase';
 import { slideInRight, fadeIn } from '../lib/animations';
 import { ConversationsSkeleton } from '../components/Skeleton';
 import { PAGE_LOAD_TIMEOUT_MS } from '../lib/constants';
+import { useFirestoreCollection } from '../lib/useFirestoreCollection';
 
 function shortWait(iso?: string) {
   if (!iso) return null;
@@ -48,10 +49,13 @@ export default function Conversations() {
   const [summarizing, setSummarizing] = useState(false);
   const [noteDraft, setNoteDraft] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<'all' | 'hot' | 'needs_review'>('all');
+  const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'mine' | 'unassigned'>('all');
   const [nowForUrgent, setNowForUrgent] = useState(Date.now());
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadRetryKey, setLoadRetryKey] = useState(0);
+  const { items: agents } = useFirestoreCollection<Agent>(businessId, 'agents', { silent: true });
+  const currentUid = auth.currentUser?.uid || null;
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -324,10 +328,29 @@ export default function Conversations() {
     });
   };
 
+  const assignConversation = async (agentId: string | null) => {
+    if (!businessId || !selectedId) return;
+    await updateDoc(doc(db, `businesses/${businessId}/conversations`, selectedId), {
+      assignedAgentId: agentId || null,
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
+  const agentLabel = (agentId?: string | null) => {
+    if (!agentId) return 'Unassigned';
+    if (currentUid && agentId === currentUid) {
+      const self = agents.find(a => a.id === agentId);
+      return self?.name ? `${self.name} (you)` : 'You';
+    }
+    return agents.find(a => a.id === agentId)?.name || agents.find(a => a.id === agentId)?.email || 'Assigned';
+  };
+
   const filtered = conversations.filter(c => {
     if (!(statusFilter === 'all' || c.status === statusFilter)) return false;
     if (priorityFilter === 'hot' && c.leadPriority !== 'hot') return false;
     if (priorityFilter === 'needs_review' && !c.needsHumanReview) return false;
+    if (assignmentFilter === 'mine' && (!currentUid || c.assignedAgentId !== currentUid)) return false;
+    if (assignmentFilter === 'unassigned' && c.assignedAgentId) return false;
     const q = search.toLowerCase();
     return (
       c.customerName?.toLowerCase().includes(q) ||
@@ -421,6 +444,21 @@ export default function Conversations() {
                 {priorityFilter === 'all' ? 'All leads' : priorityFilter === 'hot' ? 'Hot only' : 'Review queue'}
               </span>
             </div>
+            <div className="relative">
+              <User className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+              <select
+                value={assignmentFilter}
+                onChange={(e) => setAssignmentFilter(e.target.value as typeof assignmentFilter)}
+                disabled={conversations.length === 0}
+                title="Filter by assignment"
+                className="w-full appearance-none rounded-lg border border-gray-200 bg-white pl-7 pr-7 py-1.5 text-xs font-medium text-gray-700 disabled:bg-gray-100 disabled:text-gray-400"
+              >
+                <option value="all">All assignments</option>
+                <option value="mine">My chats</option>
+                <option value="unassigned">Unassigned</option>
+              </select>
+              <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
             <button
               type="button"
               onClick={() => void exportConversationsCsv()}
@@ -479,6 +517,12 @@ export default function Conversations() {
                     {chat.needsHumanReview && (
                       <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-teal-100 text-teal-900 uppercase">Review</span>
                     )}
+                    {!chat.assignedAgentId && (
+                      <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 uppercase">Open</span>
+                    )}
+                    {chat.assignedAgentId && currentUid && chat.assignedAgentId === currentUid && (
+                      <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-teal-50 text-teal-800 uppercase">Mine</span>
+                    )}
                     <div className={cn(
                       'text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-tighter',
                       chat.status === 'active' ? 'bg-green-100 text-green-700' :
@@ -522,6 +566,9 @@ export default function Conversations() {
                       {selected.leadPriority} · {selected.leadScore ?? '—'}
                     </span>
                   )}
+                  <span className="ml-1 normal-case text-[10px] font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
+                    {agentLabel(selected.assignedAgentId)}
+                  </span>
                 </p>
                 {selected.lastCustomerMessageAt && (
                   <p className="text-[10px] text-gray-400 mt-0.5">
@@ -532,6 +579,31 @@ export default function Conversations() {
             </div>
             
             <div className="flex items-center gap-2">
+              <select
+                value={selected.assignedAgentId || ''}
+                onChange={(e) => void assignConversation(e.target.value || null)}
+                className="text-xs font-semibold border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 max-w-[160px]"
+                title="Assign agent"
+              >
+                <option value="">Unassigned</option>
+                {currentUid && !agents.some(a => a.id === currentUid) && (
+                  <option value={currentUid}>Me (owner)</option>
+                )}
+                {agents.map(agent => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.name || agent.email}{agent.id === currentUid ? ' (you)' : ''}
+                  </option>
+                ))}
+              </select>
+              {currentUid && selected.assignedAgentId !== currentUid && (
+                <button
+                  type="button"
+                  onClick={() => void assignConversation(currentUid)}
+                  className="flex items-center gap-1.5 text-xs font-semibold bg-teal-50 text-teal-800 px-3 py-1.5 rounded-lg hover:bg-teal-100 border border-teal-100"
+                >
+                  Claim
+                </button>
+              )}
               {selected.status === 'human_escalated' && (
                 <button 
                   onClick={() => updateStatus('active')}
