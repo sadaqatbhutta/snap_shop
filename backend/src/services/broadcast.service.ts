@@ -1,10 +1,30 @@
 import { db } from '../config/firebase.js';
 import { broadcastQueue, defaultJobOptions, BroadcastJobData, connection } from '../queues/queue.js';
 import { buildError } from '../utils/errors.js';
-import { sendMessage } from './channelSender.js';
+import { sendMessage, type WhatsAppMetaTemplate } from './channelSender.js';
 import { logger } from '../utils/logger.js';
 import { Job } from 'bullmq';
 import { assertWithinPlanLimit, incrementUsage } from './usage.service.js';
+
+/** Resolve Meta HSM payload from a Firestore template doc, or null if not usable for WhatsApp. */
+export function resolveWhatsAppMetaFromTemplate(template: {
+  channelScope?: string;
+  metaTemplateName?: string;
+  metaLanguageCode?: string;
+  metaBodyParams?: unknown;
+}): WhatsAppMetaTemplate | null {
+  const isWhatsAppMeta =
+    template.channelScope === 'whatsapp_meta' ||
+    Boolean(template.metaTemplateName);
+  if (!isWhatsAppMeta || !template.metaTemplateName) return null;
+  return {
+    name: String(template.metaTemplateName),
+    languageCode: String(template.metaLanguageCode || 'en'),
+    bodyParams: Array.isArray(template.metaBodyParams)
+      ? template.metaBodyParams.map(String)
+      : undefined,
+  };
+}
 
 export async function scheduleBroadcast(broadcastId: string, businessId: string, scheduledAt?: string, requestId?: string) {
   await assertWithinPlanLimit(businessId, 'broadcasts');
@@ -98,24 +118,12 @@ export async function processBroadcastJob(data: BroadcastJobData) {
   }
   const template = templateSnap.data() as any;
   const messageContent = template.content as string | undefined;
-  const isWhatsAppMeta =
-    template.channelScope === 'whatsapp_meta' ||
-    Boolean(template.metaTemplateName);
+  const waTemplateMeta = resolveWhatsAppMetaFromTemplate(template);
+  const isWhatsAppMeta = Boolean(waTemplateMeta);
 
   if (!isWhatsAppMeta && !messageContent) {
     throw buildError('TEMPLATE_EMPTY', 'Template has no content', 422);
   }
-
-  const waTemplateMeta =
-    isWhatsAppMeta && template.metaTemplateName
-      ? {
-          name: String(template.metaTemplateName),
-          languageCode: String(template.metaLanguageCode || 'en'),
-          bodyParams: Array.isArray(template.metaBodyParams)
-            ? template.metaBodyParams.map(String)
-            : undefined,
-        }
-      : null;
 
   // ─── Fetch Segment Criteria ──────────────────────────────────────────────
   const segmentSnap = await db.doc(`businesses/${businessId}/segments/${segmentId}`).get();

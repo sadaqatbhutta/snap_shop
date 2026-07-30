@@ -109,9 +109,14 @@ export default function Broadcasts() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!businessId) return;
-    setSaving(true);
     const tmpl = templates.find(t => t.id === form.templateId);
     const seg = segments.find(s => s.id === form.segmentId);
+    const metaOk = tmpl?.channelScope === 'whatsapp_meta' || Boolean(tmpl?.metaTemplateName);
+    if (seg?.criteria?.channel === 'whatsapp' && !metaOk) {
+      alert('This segment is WhatsApp-only. Pick a WhatsApp Meta template (Templates → WhatsApp Meta) before saving.');
+      return;
+    }
+    setSaving(true);
     const now = new Date().toISOString();
     const docRef = await addDoc(collection(db, `businesses/${businessId}/broadcasts`), {
       businessId,
@@ -149,6 +154,18 @@ export default function Broadcasts() {
 
   const handleSendNow = async (broadcastId: string) => {
     if (!businessId || !confirm('Are you sure you want to send this broadcast now?')) return;
+    const bc = broadcasts.find(b => b.id === broadcastId);
+    const seg = segments.find(s => s.id === bc?.segmentId);
+    if (seg?.criteria?.channel === 'whatsapp' && bc?.templateId && templateNeedsMeta(bc.templateId)) {
+      alert('Cannot send: WhatsApp segment requires a Meta-approved template. Edit Templates and set WhatsApp Meta fields.');
+      return;
+    }
+    if ((!seg?.criteria?.channel || seg.criteria.channel === 'whatsapp') && bc?.templateId && templateNeedsMeta(bc.templateId)) {
+      const ok = confirm(
+        'This audience may include WhatsApp contacts. Without a Meta template, WhatsApp recipients will be skipped. Continue anyway?',
+      );
+      if (!ok) return;
+    }
     try {
       const idToken = await auth.currentUser?.getIdToken();
       const resp = await fetch(getApiUrl(`/api/broadcast/${broadcastId}`), {
@@ -215,6 +232,23 @@ export default function Broadcasts() {
   };
 
   const filtered = broadcasts.filter(b => activeTab === 'all' || b.status === activeTab);
+
+  const selectedTemplate = templates.find(t => t.id === form.templateId);
+  const selectedSegment = segments.find(s => s.id === form.segmentId);
+  const isMetaTemplate =
+    selectedTemplate?.channelScope === 'whatsapp_meta' ||
+    Boolean(selectedTemplate?.metaTemplateName);
+  const segmentChannel = selectedSegment?.criteria?.channel;
+  const segmentIsWhatsAppOnly = segmentChannel === 'whatsapp';
+  const segmentMayIncludeWhatsApp = !segmentChannel || segmentChannel === 'whatsapp';
+  const whatsappMetaWarning =
+    Boolean(form.templateId && form.segmentId && segmentMayIncludeWhatsApp && !isMetaTemplate);
+  const whatsappMetaBlocked = Boolean(form.templateId && form.segmentId && segmentIsWhatsAppOnly && !isMetaTemplate);
+
+  const templateNeedsMeta = (templateId: string) => {
+    const t = templates.find(x => x.id === templateId);
+    return !(t?.channelScope === 'whatsapp_meta' || t?.metaTemplateName);
+  };
 
   if (loading) {
     return <TableSkeleton rows={6} />;
@@ -449,7 +483,12 @@ export default function Broadcasts() {
                 <select required value={form.templateId} onChange={e => setForm({ ...form, templateId: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-600 outline-none text-sm bg-white">
                   <option value="">Select a template...</option>
-                  {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  {templates.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                      {t.channelScope === 'whatsapp_meta' || t.metaTemplateName ? ' · WhatsApp Meta' : ' · Internal'}
+                    </option>
+                  ))}
                 </select>
                 {templates.length === 0 && <p className="text-xs text-orange-500 mt-1">No templates yet. <Link to="/app/templates" className="underline">Create one first.</Link></p>}
               </div>
@@ -462,6 +501,27 @@ export default function Broadcasts() {
                 </select>
                 {segments.length === 0 && <p className="text-xs text-orange-500 mt-1">No segments yet. <Link to="/app/segments" className="underline">Create one first.</Link></p>}
               </div>
+              {whatsappMetaWarning && (
+                <div className={cn(
+                  'rounded-lg border px-3 py-2 text-xs',
+                  whatsappMetaBlocked
+                    ? 'border-red-200 bg-red-50 text-red-800'
+                    : 'border-amber-200 bg-amber-50 text-amber-900',
+                )}>
+                  {whatsappMetaBlocked ? (
+                    <>
+                      This segment is <strong>WhatsApp-only</strong>. Choose a{' '}
+                      <Link to="/app/templates" className="underline font-semibold">WhatsApp Meta template</Link>
+                      {' '}(Meta template name + language) or WhatsApp recipients cannot be sent.
+                    </>
+                  ) : (
+                    <>
+                      This audience may include WhatsApp contacts. Without a Meta-approved template, WhatsApp recipients will be skipped at send time. Prefer a{' '}
+                      <Link to="/app/templates" className="underline font-semibold">WhatsApp Meta template</Link>.
+                    </>
+                  )}
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Schedule (optional)</label>
                 <input type="datetime-local" value={form.scheduledAt} onChange={e => setForm({ ...form, scheduledAt: e.target.value })}
@@ -469,7 +529,7 @@ export default function Broadcasts() {
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancel</button>
-                <button type="submit" disabled={saving} className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-teal-700 rounded-lg hover:bg-teal-800 disabled:opacity-60 flex items-center justify-center gap-2">
+                <button type="submit" disabled={saving || whatsappMetaBlocked} className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-teal-700 rounded-lg hover:bg-teal-800 disabled:opacity-60 flex items-center justify-center gap-2">
                   {saving && <Loader2 className="w-4 h-4 animate-spin" />} Save Broadcast
                 </button>
               </div>
