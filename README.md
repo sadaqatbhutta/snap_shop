@@ -157,7 +157,7 @@ The widget posts messages to `/api/webchat/message`, which flows into the same A
 6. For teammates, add **`businesses/{businessId}/agents/{theirAuthUid}`** after they accept an invite.
 7. If the browser console shows a missing index link, open it and create the index, or redeploy indexes after updating [`firestore.indexes.json`](firestore.indexes.json).
    Includes composites for conversation `assignedAgentId` / `assignedQueue` + `updatedAt` (agent inbox filters).
-8. After pulling Phase 1 changes, redeploy rules + indexes so Meta template fields and assignment queries stay allowed.
+8. After pulling Phase 1+2 changes, redeploy rules + indexes so Meta template fields and assignment/queue queries stay allowed.
 
 ---
 
@@ -165,8 +165,9 @@ The widget posts messages to `/api/webchat/message`, which flows into the same A
 
 - **Per-business channel credentials** — Settings → Integrations (saved via `PUT /api/business/:id/integrations` into `businesses/{id}/private/credentials`; client cannot read tokens)
 - **Commerce (Shopify / Woo)** — same Integrations panel; domain/base URL + secrets enable AI order/stock tools
-- **Agent assignment** — Conversations inbox: assign/claim chats, filter My chats / Unassigned (`assignedAgentId`)
-- **WhatsApp Meta templates** — Templates can store Meta HSM name/language; WhatsApp broadcast recipients require Meta fields (no silent plain-text WA marketing sends)
+- **Agent assignment** — Conversations inbox: assign/claim chats; server-side My chats / Unassigned / queue filters (`assignedAgentId`, `assignedQueue` + indexes)
+- **Round-robin auto-assign** — On AI escalate (and manual escalate), least-loaded agent is assigned when the chat is unassigned
+- **WhatsApp Meta templates** — Manual HSM fields, broadcast Meta guard, and **Sync from Meta** (`POST /api/business/:id/integrations/meta-templates/sync`); WhatsApp broadcast recipients require Meta fields (no silent plain-text WA marketing sends)
 - **Channel tenant routing** — Meta `phone_number_id` / page ids map to SnapShop businesses via `channel_bindings/{channel:externalId}`
 - **Billing** — Free / Growth Pro / Scale Plus / Enterprise with usage metering; Stripe Checkout + Customer Portal when `STRIPE_*` env vars are set (`/api/billing/...`, webhook `POST /api/billing/webhook`). Client cannot forge `billing` / `usage` fields (Firestore rules).
 - **Plan limits** — monthly messages, AI calls, broadcasts, and agent seats enforced on webhooks, agent send, AI routes, and invites

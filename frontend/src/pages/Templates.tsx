@@ -7,17 +7,18 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   FileText, Plus, Search, Edit2, Trash2, Copy, Layout,
-  Type, Image as ImageIcon, CheckCircle2, ChevronLeft, X, Loader2
+  Type, Image as ImageIcon, CheckCircle2, ChevronLeft, X, Loader2, RefreshCw
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { useBusiness } from '../context/BusinessContext';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 import { collection, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { Template } from '../../../shared/types';
 import { useFirestoreCollection } from '../lib/useFirestoreCollection';
 import LoadErrorBanner from '../components/LoadErrorBanner';
 import { staggerContainer, staggerItem, fadeUp, scaleIn } from '../lib/animations';
+import { getApiUrl } from '../lib/apiBase';
 
 type TemplateForm = {
   name: string;
@@ -72,8 +73,31 @@ export default function Templates() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [syncingMeta, setSyncingMeta] = useState(false);
   const [form, setForm] = useState<TemplateForm>(emptyForm());
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+
+  const handleSyncMeta = async () => {
+    if (!businessId || syncingMeta) return;
+    setSyncingMeta(true);
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const resp = await fetch(getApiUrl(`/api/business/${businessId}/integrations/meta-templates/sync`), {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        throw new Error(data.message || data.error || 'Sync failed');
+      }
+      alert(`Synced Meta templates: ${data.fetched} approved, ${data.created} created, ${data.updated} updated.`);
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : 'Could not sync Meta templates. Check WhatsApp is connected in Settings.');
+    } finally {
+      setSyncingMeta(false);
+    }
+  };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -149,12 +173,24 @@ export default function Templates() {
             <p className="text-gray-500">Internal snippets or Meta-approved WhatsApp templates for broadcasts.</p>
           </div>
         </div>
-        <button
-          onClick={() => { setEditingTemplateId(null); setForm(emptyForm()); setIsModalOpen(true); }}
-          className="hover-lift flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-teal-700 rounded-lg hover:bg-teal-800"
-        >
-          <Plus className="w-4 h-4" /> Create Template
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleSyncMeta()}
+            disabled={syncingMeta || !businessId}
+            className="hover-lift flex items-center gap-2 px-4 py-2 text-sm font-medium text-teal-800 bg-teal-50 border border-teal-100 rounded-lg hover:bg-teal-100 disabled:opacity-60"
+            title="Pull approved WhatsApp templates from Meta"
+          >
+            {syncingMeta ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            Sync from Meta
+          </button>
+          <button
+            onClick={() => { setEditingTemplateId(null); setForm(emptyForm()); setIsModalOpen(true); }}
+            className="hover-lift flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-teal-700 rounded-lg hover:bg-teal-800"
+          >
+            <Plus className="w-4 h-4" /> Create Template
+          </button>
+        </div>
       </motion.div>
 
       <div className="glass-panel glow-border p-4 rounded-xl border border-gray-200/80 shadow-sm flex items-center gap-3">

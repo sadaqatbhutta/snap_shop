@@ -7,6 +7,7 @@ import { logger } from '../utils/logger.js';
 import { buildError } from '../utils/errors.js';
 import { verifyFirebaseToken, verifyBusinessAccess } from '../middlewares/auth.js';
 import { assertWithinPlanLimit, incrementUsage } from '../services/usage.service.js';
+import { autoAssignIfUnassigned } from '../services/assignment.service.js';
 
 export const conversationsRouter = Router();
 
@@ -15,6 +16,26 @@ const SendMessageSchema = z.object({
   businessId: z.string().min(1, 'businessId is required'),
   content: z.string().min(1, 'content is required'),
   senderId: z.string().min(1, 'senderId is required'), // Agent UID from Firebase Auth
+});
+
+const AutoAssignSchema = z.object({
+  conversationId: z.string().min(1),
+  businessId: z.string().min(1),
+  force: z.boolean().optional(),
+});
+
+/**
+ * POST /api/conversations/auto-assign
+ * Round-robin / least-loaded assign for escalated unassigned chats.
+ */
+conversationsRouter.post('/auto-assign', verifyFirebaseToken, verifyBusinessAccess, async (req, res, next) => {
+  try {
+    const { conversationId, businessId, force } = AutoAssignSchema.parse(req.body);
+    const agentId = await autoAssignIfUnassigned(businessId, conversationId, { force });
+    res.json({ status: 'ok', assignedAgentId: agentId });
+  } catch (err) {
+    next(err);
+  }
 });
 
 /**

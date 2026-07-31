@@ -7,7 +7,7 @@ import { cn } from '../lib/utils';
 import { useBusiness } from '../context/BusinessContext';
 import { db } from '../firebase';
 import {
-  collection, query, orderBy, onSnapshot, updateDoc, doc, limit, limitToLast, arrayUnion, getDocs,
+  collection, query, orderBy, onSnapshot, updateDoc, doc, limit, limitToLast, arrayUnion, getDocs, where,
 } from 'firebase/firestore';
 import { Conversation, Message, InternalNote, Agent } from '../../../shared/types';
 import { auth } from '../firebase';
@@ -35,6 +35,30 @@ const CHANNEL_COLORS: Record<string, string> = {
   webchat: 'bg-gray-100 text-gray-800',
 };
 
+const QUEUE_OPTIONS = ['sales', 'support', 'billing'] as const;
+type QueueFilter = 'all' | (typeof QUEUE_OPTIONS)[number];
+
+function buildConversationsListQuery(
+  businessId: string,
+  assignmentFilter: 'all' | 'mine' | 'unassigned',
+  queueFilter: QueueFilter,
+  currentUid: string | null,
+) {
+  const col = collection(db, `businesses/${businessId}/conversations`);
+  const lim = 100;
+
+  if (assignmentFilter === 'mine' && currentUid) {
+    return query(col, where('assignedAgentId', '==', currentUid), orderBy('updatedAt', 'desc'), limit(lim));
+  }
+  if (assignmentFilter === 'unassigned') {
+    return query(col, where('assignedAgentId', '==', ''), orderBy('updatedAt', 'desc'), limit(lim));
+  }
+  if (queueFilter !== 'all') {
+    return query(col, where('assignedQueue', '==', queueFilter), orderBy('updatedAt', 'desc'), limit(lim));
+  }
+  return query(col, orderBy('updatedAt', 'desc'), limit(lim));
+}
+
 export default function Conversations() {
   const { businessId, business } = useBusiness();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -50,6 +74,7 @@ export default function Conversations() {
   const [noteDraft, setNoteDraft] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<'all' | 'hot' | 'needs_review'>('all');
   const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'mine' | 'unassigned'>('all');
+  const [queueFilter, setQueueFilter] = useState<QueueFilter>('all');
   const [nowForUrgent, setNowForUrgent] = useState(Date.now());
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -68,7 +93,7 @@ export default function Conversations() {
     return () => clearInterval(timer);
   }, []);
 
-  // Conversations list — getDocs only first (matches Analytics path). Live updates below.
+  // Conversations list — server-side assignment/queue filters use composite indexes.
   useEffect(() => {
     if (!businessId) {
       setLoading(false);
@@ -78,10 +103,11 @@ export default function Conversations() {
     setLoadError(null);
     let cancelled = false;
 
-    const conversationsQuery = query(
-      collection(db, `businesses/${businessId}/conversations`),
-      orderBy('updatedAt', 'desc'),
-      limit(50),
+    const conversationsQuery = buildConversationsListQuery(
+      businessId,
+      assignmentFilter,
+      queueFilter,
+      currentUid,
     );
 
     const timeout = window.setTimeout(() => {
@@ -114,22 +140,23 @@ export default function Conversations() {
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [businessId, loadRetryKey]);
+  }, [businessId, loadRetryKey, assignmentFilter, queueFilter, currentUid]);
 
   // Live list updates (after first paint)
   useEffect(() => {
     if (!businessId || loading || loadError) return;
-    const conversationsQuery = query(
-      collection(db, `businesses/${businessId}/conversations`),
-      orderBy('updatedAt', 'desc'),
-      limit(50),
+    const conversationsQuery = buildConversationsListQuery(
+      businessId,
+      assignmentFilter,
+      queueFilter,
+      currentUid,
     );
     return onSnapshot(
       conversationsQuery,
       snap => setConversations(snap.docs.map(d => ({ id: d.id, ...d.data() } as Conversation))),
       err => console.error('Conversations listener failed:', err),
     );
-  }, [businessId, loading, loadError]);
+  }, [businessId, loading, loadError, assignmentFilter, queueFilter, currentUid]);
 
   // Live messages for selected conversation
   useEffect(() => {
@@ -326,12 +353,32 @@ export default function Conversations() {
       status,
       updatedAt: new Date().toISOString(),
     });
+    if (status === 'human_escalated' && !selected?.assignedAgentId) {
+      try {
+        const idToken = await auth.currentUser?.getIdToken();
+        await fetch(getApiUrl('/api/conversations/auto-assign'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+          body: JSON.stringify({ businessId, conversationId: selectedId }),
+        });
+      } catch (err) {
+        console.error('Auto-assign failed:', err);
+      }
+    }
   };
 
   const assignConversation = async (agentId: string | null) => {
     if (!businessId || !selectedId) return;
     await updateDoc(doc(db, `businesses/${businessId}/conversations`, selectedId), {
-      assignedAgentId: agentId || null,
+      assignedAgentId: agentId || '',
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
+  const setQueue = async (queue: string) => {
+    if (!businessId || !selectedId) return;
+    await updateDoc(doc(db, `businesses/${businessId}/conversations`, selectedId), {
+      assignedQueue: queue || null,
       updatedAt: new Date().toISOString(),
     });
   };
@@ -349,8 +396,10 @@ export default function Conversations() {
     if (!(statusFilter === 'all' || c.status === statusFilter)) return false;
     if (priorityFilter === 'hot' && c.leadPriority !== 'hot') return false;
     if (priorityFilter === 'needs_review' && !c.needsHumanReview) return false;
+    // Assignment/queue usually applied server-side; keep client checks when both filters combine.
     if (assignmentFilter === 'mine' && (!currentUid || c.assignedAgentId !== currentUid)) return false;
     if (assignmentFilter === 'unassigned' && c.assignedAgentId) return false;
+    if (queueFilter !== 'all' && c.assignedQueue !== queueFilter) return false;
     const q = search.toLowerCase();
     return (
       c.customerName?.toLowerCase().includes(q) ||
@@ -449,13 +498,27 @@ export default function Conversations() {
               <select
                 value={assignmentFilter}
                 onChange={(e) => setAssignmentFilter(e.target.value as typeof assignmentFilter)}
-                disabled={conversations.length === 0}
                 title="Filter by assignment"
-                className="w-full appearance-none rounded-lg border border-gray-200 bg-white pl-7 pr-7 py-1.5 text-xs font-medium text-gray-700 disabled:bg-gray-100 disabled:text-gray-400"
+                className="w-full appearance-none rounded-lg border border-gray-200 bg-white pl-7 pr-7 py-1.5 text-xs font-medium text-gray-700"
               >
                 <option value="all">All assignments</option>
                 <option value="mine">My chats</option>
                 <option value="unassigned">Unassigned</option>
+              </select>
+              <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+            <div className="relative">
+              <Filter className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+              <select
+                value={queueFilter}
+                onChange={(e) => setQueueFilter(e.target.value as QueueFilter)}
+                title="Filter by workflow queue"
+                className="w-full appearance-none rounded-lg border border-gray-200 bg-white pl-7 pr-7 py-1.5 text-xs font-medium text-gray-700"
+              >
+                <option value="all">All queues</option>
+                {QUEUE_OPTIONS.map(q => (
+                  <option key={q} value={q}>{q.charAt(0).toUpperCase() + q.slice(1)}</option>
+                ))}
               </select>
               <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             </div>
@@ -523,6 +586,11 @@ export default function Conversations() {
                     {chat.assignedAgentId && currentUid && chat.assignedAgentId === currentUid && (
                       <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-teal-50 text-teal-800 uppercase">Mine</span>
                     )}
+                    {chat.assignedQueue && (
+                      <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-sky-50 text-sky-800 uppercase">
+                        {chat.assignedQueue}
+                      </span>
+                    )}
                     <div className={cn(
                       'text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-tighter',
                       chat.status === 'active' ? 'bg-green-100 text-green-700' :
@@ -569,6 +637,11 @@ export default function Conversations() {
                   <span className="ml-1 normal-case text-[10px] font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
                     {agentLabel(selected.assignedAgentId)}
                   </span>
+                  {selected.assignedQueue && (
+                    <span className="ml-1 normal-case text-[10px] font-semibold text-sky-800 bg-sky-50 px-1.5 py-0.5 rounded capitalize">
+                      {selected.assignedQueue}
+                    </span>
+                  )}
                 </p>
                 {selected.lastCustomerMessageAt && (
                   <p className="text-[10px] text-gray-400 mt-0.5">
@@ -579,6 +652,17 @@ export default function Conversations() {
             </div>
             
             <div className="flex items-center gap-2">
+              <select
+                value={selected.assignedQueue || ''}
+                onChange={(e) => void setQueue(e.target.value)}
+                className="text-xs font-semibold border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 max-w-[120px]"
+                title="Queue"
+              >
+                <option value="">No queue</option>
+                {QUEUE_OPTIONS.map(q => (
+                  <option key={q} value={q}>{q.charAt(0).toUpperCase() + q.slice(1)}</option>
+                ))}
+              </select>
               <select
                 value={selected.assignedAgentId || ''}
                 onChange={(e) => void assignConversation(e.target.value || null)}

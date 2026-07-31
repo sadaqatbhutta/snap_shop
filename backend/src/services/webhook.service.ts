@@ -13,6 +13,7 @@ import { assertWithinPlanLimit, incrementUsage } from './usage.service.js';
 import { notifyBusinessOwners } from './notification.service.js';
 import { AppError } from '../utils/errors.js';
 import { resolveBusinessId } from './tenantResolver.service.js';
+import { pickLeastLoadedAgent } from './assignment.service.js';
 
 export async function enqueueWebhookMessage(channel: string, body: Record<string, unknown>, requestId?: string) {
   return webhookQueue.add(
@@ -130,6 +131,7 @@ export async function processWebhookJob(channel: string, body: Record<string, un
         channel,
         lastMessage: content,
         status: 'active',
+        assignedAgentId: '',
         createdAt: now,
         updatedAt: now,
       });
@@ -269,6 +271,16 @@ export async function processWebhookJob(channel: string, body: Record<string, un
   if (aiConfidence !== undefined) convPatch.aiConfidence = aiConfidence;
   if (finalStatus === 'human_escalated') convPatch.status = 'human_escalated';
   if (assignedQueue) convPatch.assignedQueue = assignedQueue;
+
+  // Fresh escalate → least-loaded agent (do not steal existing assignee)
+  if (!isHumanHandling && shouldEscalate) {
+    const convBefore = await db.doc(`businesses/${businessId}/conversations/${conversationId}`).get();
+    const existingAssignee = convBefore.data()?.assignedAgentId;
+    if (!existingAssignee) {
+      const agentId = await pickLeastLoadedAgent(businessId);
+      if (agentId) convPatch.assignedAgentId = agentId;
+    }
+  }
 
   await db.doc(`businesses/${businessId}/conversations/${conversationId}`).update(convPatch);
 
