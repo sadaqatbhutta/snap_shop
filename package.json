@@ -13,7 +13,8 @@
     "build": "vite build --config frontend/vite.config.ts",
     "preview": "vite preview --config frontend/vite.config.ts",
     "lint": "tsc --noEmit",
-    "lint:eslint": "eslint frontend/src backend --max-warnings 50"
+    "lint:eslint": "eslint frontend/src backend --max-warnings 50",
+    "deploy:firestore": "npx firebase-tools deploy --only firestore:rules,firestore:indexes"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
