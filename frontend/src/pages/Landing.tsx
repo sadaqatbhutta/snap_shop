@@ -28,67 +28,82 @@ export default function Landing() {
           </Link>
         </header>
 
-        <div className="relative z-20 grid min-h-[calc(100svh-5.5rem)] grid-cols-1 md:grid-cols-2 gap-10 md:gap-8 items-end md:items-center px-6 md:px-12 pb-14 md:pb-20 max-w-7xl mx-auto w-full">
-          <div className="flex flex-col justify-end md:justify-center pb-2 md:pb-0 md:pr-4 lg:pr-8">
-            <motion.p
-              className="font-display text-[clamp(3.2rem,8vw,6.25rem)] leading-[0.92] text-white"
-              initial={{ opacity: 0, y: 28 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-            >
-              SnapShop
-            </motion.p>
+        {/* Right — product phone (desktop only) */}
+        <motion.aside
+          className="pointer-events-none absolute z-10 hidden lg:flex items-center justify-end right-0 top-[8%] bottom-[4%] w-[min(48vw,30rem)] pr-4 xl:pr-10"
+          initial={{ opacity: 0, x: 28 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.28, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <div
+            className="absolute right-[12%] top-1/2 -translate-y-1/2 h-[70%] w-[70%] rounded-full bg-[var(--accent)]/25 blur-[80px]"
+            aria-hidden
+          />
+          <img
+            src="/hero-whatsapp-phone.webp"
+            alt="SnapShop AI answering a customer on WhatsApp"
+            className="relative max-h-full w-auto max-w-full object-contain select-none"
+            width={460}
+            height={900}
+            decoding="async"
+          />
+        </motion.aside>
 
-            <motion.p
-              className="mt-6 text-lg md:text-xl text-white/70 max-w-md leading-relaxed"
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.12, duration: 0.5 }}
-            >
-              Conversations that sell while you sleep — AI inbox, knowledge, and campaigns in one workspace.
-            </motion.p>
-
-            <motion.div
-              className="mt-9 flex flex-wrap gap-3"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.22, duration: 0.45 }}
-            >
-              <Link
-                to="/app"
-                className="inline-flex items-center gap-2 rounded-[0.7rem] bg-[var(--accent)] px-6 py-3.5 text-sm font-bold text-white hover:brightness-110"
-              >
-                Start free <ArrowRight className="w-4 h-4" />
-              </Link>
-              <a
-                href="#product"
-                className="inline-flex items-center gap-2 rounded-[0.7rem] border border-white/25 bg-white/5 px-6 py-3.5 text-sm font-semibold text-white backdrop-blur-sm hover:bg-white/10"
-              >
-                See the product
-              </a>
-            </motion.div>
-          </div>
-
-          {/* Product visual — fills the right half so the stage isn’t left-heavy */}
-          <motion.div
-            className="relative flex flex-col justify-center gap-3.5 w-full max-w-lg md:max-w-none md:pl-2 lg:pl-8 pb-2"
-            initial={{ opacity: 0, x: 28 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.28, duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+        <div className="relative z-20 flex flex-col justify-end min-h-[calc(100svh-5.5rem)] px-6 md:px-12 pb-14 md:pb-20 max-w-6xl lg:max-w-[54%]">
+          <motion.p
+            className="font-display text-[clamp(3.4rem,11vw,7.5rem)] leading-[0.92] text-white max-w-4xl"
+            initial={{ opacity: 0, y: 28 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
           >
-            <div className="pointer-events-none absolute -inset-8 lg:-inset-12 rounded-full bg-[var(--accent)]/15 blur-3xl" aria-hidden />
-            <div className="chat-bubble-demo relative self-start max-w-[88%] rounded-2xl rounded-bl-md bg-white/10 border border-white/15 px-4 py-3.5 text-[0.95rem] text-white/90 backdrop-blur-md">
+            SnapShop
+          </motion.p>
+
+          <motion.p
+            className="mt-6 text-lg md:text-xl text-white/70 max-w-lg leading-relaxed"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.12, duration: 0.5 }}
+          >
+            Conversations that sell while you sleep — AI inbox, knowledge, and campaigns in one workspace.
+          </motion.p>
+
+          <motion.div
+            className="mt-9 flex flex-wrap gap-3"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.22, duration: 0.45 }}
+          >
+            <Link
+              to="/app"
+              className="inline-flex items-center gap-2 rounded-[0.7rem] bg-[var(--accent)] px-6 py-3.5 text-sm font-bold text-white hover:brightness-110"
+            >
+              Start free <ArrowRight className="w-4 h-4" />
+            </Link>
+            <a
+              href="#product"
+              className="inline-flex items-center gap-2 rounded-[0.7rem] border border-white/25 bg-white/5 px-6 py-3.5 text-sm font-semibold text-white backdrop-blur-sm hover:bg-white/10"
+            >
+              See the product
+            </a>
+          </motion.div>
+
+          {/* Chat preview on mobile only — desktop uses the phone image */}
+          <motion.div
+            className="mt-14 md:mt-16 flex flex-col gap-3 max-w-md lg:hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4, duration: 0.6 }}
+          >
+            <div className="chat-bubble-demo self-start rounded-2xl rounded-bl-md bg-white/10 border border-white/15 px-4 py-3 text-sm text-white/90 backdrop-blur-md">
               Do you have the navy hoodie in XL?
             </div>
-            <div className="chat-bubble-demo relative self-end max-w-[90%] rounded-2xl rounded-br-md bg-[var(--accent)] px-4 py-3.5 text-[0.95rem] text-white shadow-[0_18px_40px_-20px_rgba(0,168,150,0.85)] [animation-delay:0.8s]">
+            <div className="chat-bubble-demo self-end rounded-2xl rounded-br-md bg-[var(--accent)]/90 px-4 py-3 text-sm text-white shadow-lg [animation-delay:0.8s]">
               Yes — XL navy is in stock. Want me to reserve one?
             </div>
-            <div className="chat-bubble-demo relative self-start max-w-[85%] rounded-2xl rounded-bl-md bg-white/10 border border-white/15 px-4 py-3.5 text-[0.95rem] text-white/90 backdrop-blur-md [animation-delay:1.4s]">
+            <div className="chat-bubble-demo self-start rounded-2xl rounded-bl-md bg-white/10 border border-white/15 px-4 py-3 text-sm text-white/90 backdrop-blur-md [animation-delay:1.4s]">
               Yes please — COD to Gulberg.
             </div>
-            <p className="relative mt-2 text-[11px] uppercase tracking-[0.22em] font-semibold text-white/35 self-end">
-              Live on WhatsApp
-            </p>
           </motion.div>
         </div>
       </section>
