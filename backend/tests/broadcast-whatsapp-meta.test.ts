@@ -1,11 +1,14 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-const sendMessage = vi.fn(async () => undefined);
+const sendMessage = vi.fn<
+  [string, string, string, string, string | undefined, Record<string, unknown> | undefined],
+  Promise<void>
+>(async () => undefined);
 const loggerError = vi.fn();
 const loggerInfo = vi.fn();
 
 vi.mock('../src/services/channelSender.js', () => ({
-  sendMessage: (...args: unknown[]) => sendMessage(...args),
+  sendMessage,
 }));
 
 vi.mock('../src/utils/logger.js', () => ({
@@ -23,7 +26,7 @@ vi.mock('../src/services/usage.service.js', () => ({
   incrementUsage: vi.fn(async () => undefined),
 }));
 
-const broadcastUpdate = vi.fn(async () => undefined);
+const broadcastUpdate = vi.fn<[Record<string, unknown>], Promise<void>>(async () => undefined);
 let templateData: Record<string, unknown> = {};
 let segmentData: Record<string, unknown> = {};
 let customerDocs: Array<{ id: string; data: () => Record<string, unknown> }> = [];
@@ -47,7 +50,7 @@ vi.mock('../src/config/firebase.js', () => ({
         }
         return { exists: false, data: () => undefined };
       },
-      update: (...args: unknown[]) => broadcastUpdate(...args),
+      update: broadcastUpdate,
     }),
     collection: () => {
       const chain: Record<string, unknown> = {};
@@ -75,8 +78,8 @@ vi.mock('../src/config/firebase.js', () => ({
 describe('resolveWhatsAppMetaFromTemplate', () => {
   it('returns null for internal templates without metaTemplateName', async () => {
     const { resolveWhatsAppMetaFromTemplate } = await import('../src/services/broadcast.service.js');
-    expect(resolveWhatsAppMetaFromTemplate({ content: 'Hello', channelScope: 'internal' })).toBeNull();
-    expect(resolveWhatsAppMetaFromTemplate({ content: 'Hello' })).toBeNull();
+    expect(resolveWhatsAppMetaFromTemplate({ channelScope: 'internal' })).toBeNull();
+    expect(resolveWhatsAppMetaFromTemplate({})).toBeNull();
   });
 
   it('returns Meta payload when metaTemplateName is set', async () => {

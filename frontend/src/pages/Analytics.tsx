@@ -68,7 +68,7 @@ export default function Analytics() {
       setLoadError(null);
 
       const withTimeout = async <T,>(promise: Promise<T>, label: string): Promise<T> => {
-        let timer: ReturnType<typeof setTimeout> | undefined;
+        let timer: number | undefined;
         try {
           return await Promise.race([
             promise,
@@ -80,7 +80,7 @@ export default function Analytics() {
             }),
           ]);
         } finally {
-          if (timer) window.clearTimeout(timer);
+          if (timer !== undefined) window.clearTimeout(timer);
         }
       };
 

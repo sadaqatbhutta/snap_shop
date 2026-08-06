@@ -8,7 +8,7 @@ vi.mock('../src/utils/logger.js', () => ({
 
 let agentIds: string[] = [];
 let openConversations: Array<{ assignedAgentId?: string }> = [];
-const updateMock = vi.fn(async () => undefined);
+const updateMock = vi.fn<[Record<string, unknown>], Promise<void>>(async () => undefined);
 let conversationData: Record<string, unknown> = {};
 
 vi.mock('../src/config/firebase.js', () => ({
@@ -42,7 +42,7 @@ vi.mock('../src/config/firebase.js', () => ({
         exists: true,
         data: () => conversationData,
       }),
-      update: (...args: unknown[]) => updateMock(...args),
+      update: updateMock,
     }),
   },
 }));

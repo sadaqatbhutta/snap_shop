@@ -18,6 +18,8 @@ const ConfigSchema = z.object({
 
   FIREBASE_PROJECT_ID: z.string().min(1, 'FIREBASE_PROJECT_ID is required'),
   FIREBASE_SERVICE_ACCOUNT_KEY: z.string().optional(),
+  /** Named Firestore DB id (must match VITE_FIREBASE_FIRESTORE_DATABASE_ID). Omit for (default). */
+  FIREBASE_FIRESTORE_DATABASE_ID: z.string().optional(),
 
   REDIS_URL: z.string().default('redis://localhost:6379'),
 

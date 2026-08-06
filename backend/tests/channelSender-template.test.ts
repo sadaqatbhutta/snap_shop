@@ -30,9 +30,11 @@ vi.mock('../src/utils/retry.js', () => ({
   withRetry: async (fn: () => Promise<unknown>) => fn(),
 }));
 
-const axiosPost = vi.fn(async () => ({ data: { messages: [{ id: 'wamid.1' }] } }));
+const axiosPost = vi.fn<[string, Record<string, unknown>], Promise<{ data: { messages: { id: string }[] } }>>(
+  async () => ({ data: { messages: [{ id: 'wamid.1' }] } }),
+);
 vi.mock('axios', () => ({
-  default: { post: (...args: unknown[]) => axiosPost(...args) },
+  default: { post: axiosPost },
 }));
 
 describe('sendMessage WhatsApp Meta template', () => {

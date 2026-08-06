@@ -19,7 +19,8 @@ try {
     });
   }
 
-  db = getFirestore();
+  const databaseId = config.FIREBASE_FIRESTORE_DATABASE_ID?.trim();
+  db = databaseId ? getFirestore(databaseId) : getFirestore();
   auth = getAuth();
 } catch (error) {
   logger.error({ error: error instanceof Error ? error.message : String(error) }, 'Firebase Admin initialization failed');

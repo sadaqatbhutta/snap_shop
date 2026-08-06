@@ -10,3 +10,7 @@ logs/
 .env.local
 .env.*.local
 firebase-applet-config.json
+
+# Firebase Admin SDK private key
+backend/service-account.json
+*-firebase-adminsdk-*.json

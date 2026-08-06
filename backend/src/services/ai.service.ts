@@ -9,7 +9,7 @@ import { getImprovementHints } from './feedback.service.js';
 import { understandMediaMessage, MultimodalInput } from './multimodal.service.js';
 
 const ai = new GoogleGenAI({ apiKey: config.GEMINI_API_KEY });
-const AI_MODEL = 'gemini-2.0-flash';
+const AI_MODEL = 'gemini-flash-latest';
 
 export type AIHistoryItem = { role: 'user' | 'model'; content: string };
 
